@@ -1,20 +1,45 @@
-// New Features Logic
-let taskList = [];
+// ============================================
+// ENHANCED PRODUCTIVITY TOOL - JAVASCRIPT
+// ============================================
 
+// State Management
+let taskList = [];
+let currentUser = "Penjor";
+
+// Inspirational Quotes
+const quotes = [
+    "Focus on being productive instead of busy.",
+    "The secret of getting ahead is getting started.",
+    "Your mind is for having ideas, not holding them.",
+    "Done is better than perfect.",
+    "Success is the sum of small efforts repeated day in and day out.",
+    "The only way to do great work is to love what you do.",
+    "Small progress is still progress.",
+    "You don't have to see the whole staircase, just take the first step."
+];
+
+// ===== MOOD MANAGEMENT =====
 function setMood(mood, btn) {
     document.getElementById('selected-mood').value = mood;
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    
+    // Haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(50);
+    }
 }
 
+// ===== TASK MANAGEMENT =====
 function addTask() {
     const input = document.getElementById('task-input');
     const val = input.value.trim();
+    
     if (val) {
         taskList.push(val);
         updateTaskListUI();
         input.value = '';
-        // Sync with your original 'tasks' ID so your saveEntry() function still works
+        input.focus();
         document.getElementById('tasks').value = taskList.join(', ');
     }
 }
@@ -23,7 +48,7 @@ function updateTaskListUI() {
     const list = document.getElementById('task-checklist');
     list.innerHTML = taskList.map((t, i) => `
         <li>
-            ${t} 
+            <span>${t}</span>
             <span class="delete-task" onclick="removeTask(${i})">✕</span>
         </li>
     `).join('');
@@ -35,14 +60,7 @@ function removeTask(index) {
     document.getElementById('tasks').value = taskList.join(', ');
 }
 
-const quotes = [
-    "Focus on being productive instead of busy.",
-    "The secret of getting ahead is getting started.",
-    "Your mind is for having ideas, not holding them.",
-    "Done is better than perfect."
-];
-let currentUser = "Penjor";
-
+// ===== TIME BLOCK MANAGEMENT =====
 function autoGenerateBlocksManual() {
     const total = parseFloat(document.getElementById("total-hours").value) || 0;
     const blocks = parseInt(document.getElementById("blocks").value) || 1;
@@ -52,30 +70,59 @@ function autoGenerateBlocksManual() {
     for (let i = 1; i <= blocks; i++) {
         blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
     }
-    document.getElementById("block-tasks").value = blockLabels.join(", ");
+    
+    const blockTasksInput = document.getElementById("block-tasks");
+    blockTasksInput.value = blockLabels.join(", ");
+    
+    // Visual feedback
+    blockTasksInput.style.borderColor = '#10B981';
+    setTimeout(() => {
+        blockTasksInput.style.borderColor = '';
+    }, 2000);
 }
 
+// ===== LOGIN FUNCTION =====
 function login() {
     const name = document.getElementById("username").value.trim();
     if (name) {
         currentUser = name;
     }
+    
+    // Screen transition
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("main-screen").classList.remove("hidden");
     
+    // Populate header
     document.getElementById("greeting-name").textContent = currentUser;
-    document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
-    document.getElementById('daily-quote').textContent = quotes[Math.floor(Math.random() * quotes.length)];
-    // Auto-generate blocks on login
+    document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    // Set random quote
+    document.getElementById('daily-quote').textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
+    
+    // Auto-generate blocks
     setTimeout(() => {
         autoGenerateBlocksManual();
     }, 100);
     
     // Setup event listeners
+    setupEventListeners();
+}
+
+// ===== EVENT LISTENERS SETUP =====
+function setupEventListeners() {
     const totalHoursInput = document.getElementById("total-hours");
     const blocksInput = document.getElementById("blocks");
     const blockTasksInput = document.getElementById("block-tasks");
+    const ratingSlider = document.getElementById("productivity");
+    const ratingValue = document.getElementById("rating-value");
+    const passwordInput = document.getElementById("password");
+    const taskInput = document.getElementById("task-input");
     
+    // Auto-generate blocks on input change
     function autoGenerateBlocks() {
         const total = parseFloat(totalHoursInput.value) || 0;
         const blocks = parseInt(blocksInput.value) || 1;
@@ -91,92 +138,193 @@ function login() {
     totalHoursInput.addEventListener("input", autoGenerateBlocks);
     blocksInput.addEventListener("input", autoGenerateBlocks);
     
-    // Update rating live
-    const ratingSlider = document.getElementById("productivity");
-    const ratingValue = document.getElementById("rating-value");
+    // Update rating display
     ratingSlider.addEventListener("input", () => {
         ratingValue.textContent = ratingSlider.value;
     });
+    
+    // Enter key on password field
+    if (passwordInput) {
+        passwordInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") login();
+        });
+    }
+    
+    // Enter key on task input
+    if (taskInput) {
+        taskInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                addTask();
+            }
+        });
+    }
 }
 
+// ===== LOGOUT FUNCTION =====
 function logout() {
     document.getElementById("main-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
     document.getElementById("summary").classList.add("hidden");
+    taskList = [];
 }
 
+// ===== SAVE ENTRY FUNCTION =====
 function saveEntry() {
-    // 1. Get all the values from the form
+    // Get form values
     const tasks = document.getElementById("tasks").value.trim();
     const totalHours = document.getElementById("total-hours").value;
     const blockTasks = document.getElementById("block-tasks").value.trim();
     const blocks = document.getElementById("blocks").value;
     const productivity = document.getElementById("productivity").value;
     const comments = document.getElementById("comments").value.trim();
-    
-    // --- ADDED THIS LINE: Get the mood value ---
-    const mood = document.getElementById("selected-mood").value; 
+    const mood = document.getElementById("selected-mood").value;
 
-    // 2. Validation: Make sure they entered tasks
+    // Validation
     if (!tasks) {
-        alert("❌ Please add at least one task today.");
+        showAlert("❌ Please add at least one task today.", "error");
         return;
     }
     if (!blockTasks) {
-        alert("❌ Please divide your work into blocks (use Auto-Generate button).");
+        showAlert("❌ Please divide your work into blocks.", "error");
         return;
     }
 
-    // 3. Calculate hours per block
+    // Calculate hours per block
     const hoursPerBlock = (parseFloat(totalHours) / parseInt(blocks)).toFixed(1);
 
-    // 4. Show summary on screen
-    document.getElementById("sum-tasks").textContent = tasks;
-    document.getElementById("sum-block-tasks").textContent = blockTasks;
-    document.getElementById("sum-hours").textContent = totalHours;
-    document.getElementById("sum-blocks").textContent = blocks;
-    document.getElementById("sum-per-block").textContent = hoursPerBlock;
-    document.getElementById("sum-rating").textContent = productivity;
-    document.getElementById("sum-comments").textContent = comments || "No comments added.";
-
-    document.getElementById("summary").classList.remove("hidden");
-
-    // 5. Generate feedback lessons
-    let feedback = "";
-    if (productivity >= 9) feedback = "Excellent! You were highly focused today.";
-    else if (productivity >= 6) feedback = "Good job! Small improvements can make it even better.";
-    else if (productivity >= 4) feedback = "Fair. Try reducing distractions tomorrow.";
-    else feedback = "Room for improvement. Planning and focus will help.";
-
-    const lessonsHTML = `
-        <li><strong>Morning Mood:</strong> You started the day feeling ${mood}</li>
-        <li><strong>Planning the Day:</strong> You planned your tasks and time blocks clearly.</li>
-        <li><strong>Focus Area:</strong> You worked on: ${tasks}</li>
-        <li><strong>Growth:</strong> ${feedback}</li>
-    `;
-    document.getElementById("lessons-list").innerHTML = lessonsHTML;
-
-    // 6. SAVE TO HISTORY (This is the part you were looking for)
-    let history = JSON.parse(localStorage.getItem("productivityHistory") || "[]");
-    
-    history.push({
-        date: new Date().toLocaleDateString(),
-        tasks: tasks,
-        mood: mood,           // <--- ADDED THIS LINE
-        blockTasks: blockTasks,
-        productivity: productivity,
-        comments: comments
+    // Update summary display
+    displaySummary({
+        tasks,
+        blockTasks,
+        totalHours,
+        blocks,
+        hoursPerBlock,
+        productivity,
+        comments,
+        mood
     });
-    
-    localStorage.setItem("productivityHistory", JSON.stringify(history));
 
-    // Scroll to summary so the user sees it
+    // Generate and display lessons
+    generateLessons(mood, tasks, productivity, comments);
+
+    // Save to localStorage
+    saveToHistory({
+        date: new Date().toLocaleDateString(),
+        tasks,
+        mood,
+        blockTasks,
+        totalHours,
+        blocks,
+        productivity,
+        comments,
+        timestamp: new Date().toISOString()
+    });
+
+    // Visual feedback
+    showAlert("✅ Today's entry saved successfully!", "success");
+    
+    // Scroll to summary
     setTimeout(() => {
         document.getElementById("summary").scrollIntoView({ behavior: "smooth" });
-    }, 200);
+    }, 300);
 }
 
-// Allow pressing Enter in login
-document.getElementById("password").addEventListener("keypress", function(e) {         
-    if (e.key === "Enter") login();
+// ===== DISPLAY SUMMARY =====
+function displaySummary(data) {
+    document.getElementById("sum-tasks").textContent = data.tasks;
+    document.getElementById("sum-block-tasks").textContent = data.blockTasks;
+    document.getElementById("sum-hours").textContent = `${data.totalHours} hours`;
+    document.getElementById("sum-blocks").textContent = data.blocks;
+    document.getElementById("sum-per-block").textContent = data.hoursPerBlock;
+    document.getElementById("sum-rating").textContent = `${data.productivity}/10`;
+    document.getElementById("sum-comments").textContent = data.comments || "No notes added.";
+
+    document.getElementById("summary").classList.remove("hidden");
+}
+
+// ===== GENERATE LESSONS =====
+function generateLessons(mood, tasks, productivity, comments) {
+    let feedback = "";
+    let icon = "📌";
+    
+    if (productivity >= 9) {
+        feedback = "Excellent! You were highly focused and productive today.";
+        icon = "🚀";
+    } else if (productivity >= 6) {
+        feedback = "Good job! Small improvements can make it even better next time.";
+        icon = "⭐";
+    } else if (productivity >= 4) {
+        feedback = "Fair effort. Try reducing distractions and planning better tomorrow.";
+        icon = "🎯";
+    } else {
+        feedback = "Room for improvement. Focus on planning and minimizing interruptions.";
+        icon = "💪";
+    }
+
+    let moodEmoji = mood;
+    let moodText = "focused";
+    if (mood === "😊") moodText = "happy and positive";
+    if (mood === "😴") moodText = "tired";
+
+    const lessonsHTML = `
+        <li><strong>🌅 Morning Mood:</strong> You started the day feeling ${moodEmoji} (${moodText})</li>
+        <li><strong>📋 Plan Execution:</strong> You worked on: ${tasks}</li>
+        <li><strong>📊 Progress:</strong> ${feedback}</li>
+        <li><strong>${icon} Key Takeaway:</strong> ${comments || "Every day is a chance to improve your productivity."}</li>
+    `;
+    
+    document.getElementById("lessons-list").innerHTML = lessonsHTML;
+}
+
+// ===== SAVE TO HISTORY =====
+function saveToHistory(entry) {
+    let history = JSON.parse(localStorage.getItem("productivityHistory") || "[]");
+    history.push(entry);
+    localStorage.setItem("productivityHistory", JSON.stringify(history));
+}
+
+// ===== ALERT FUNCTION =====
+function showAlert(message, type = "info") {
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#3B82F6'};
+        color: white;
+        padding: 16px 24px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        z-index: 9999;
+        animation: slideInDown 0.4s ease-out;
+        font-weight: 600;
+    `;
+    alert.textContent = message;
+    
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.style.animation = 'slideInUp 0.4s ease-out reverse';
+        setTimeout(() => alert.remove(), 400);
+    }, 2500);
+}
+
+// ===== INITIALIZE ON PAGE LOAD =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default mood selection
+    const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
+    if (defaultMoodBtn) {
+        defaultMoodBtn.classList.add('active');
+    }
 });
+
+// ===== ALLOW ENTER ON LOGIN PASSWORD FIELD =====
+if (document.getElementById("password")) {
+    document.getElementById("password").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") {
+            login();
+        }
+    });
+}

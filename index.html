@@ -4,86 +4,160 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Productive Self-Assessment Tool</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">     
 </head>
 <body>
+    <div class="background-pattern"></div>
     <div class="container">
         <!-- Login Screen -->
-        <div id="login-screen" class="screen">
-            <h1>Personal Productive Self-Assessment Tool</h1>
-            <p>Welcome back, Smart Worker! 🌿</p>
-            <input type="text" id="username" placeholder="Your Name" value="Penjor" required>
-            <input type="password" id="password" placeholder="Password (any for demo)">
-            <button onclick="login()">Enter</button>
+        <div id="login-screen" class="screen login-screen">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1 class="logo-title">Chimla Tabdew</h1>
+                    <p class="logo-subtitle">Personal Productivity Companion</p>
+                </div>
+                
+                <div class="login-form-wrapper">
+                    <p class="welcome-text">Welcome back, Smart Worker! 🌿</p>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Your Name</label>
+                        <input type="text" id="username" placeholder="Enter your name" value="Penjor" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Password (any for demo)</label>
+                        <input type="password" id="password" placeholder="••••••" class="form-input">
+                    </div>
+                    
+                    <button onclick="login()" class="btn btn-primary">Enter Workspace</button>
+                </div>
+            </div>
         </div>
 
         <!-- Main Dashboard -->
-        <div id="main-screen" class="screen hidden">         
-            <header>
-                <!-- ADD THIS: Daily Quote Section -->
-<div id="quote-container" style="text-align: center; padding: 10px; font-style: italic; color: #004d40;">
-    <p id="daily-quote">"Loading inspiration..."</p>
-</div>
-                <h2>Good morning, <span id="greeting-name"></span>!</h2>
-                <p>THIMPHU • BHUTAN • <span id="current-date"></span></p>
-                <button onclick="logout()">Logout</button>
+        <div id="main-screen" class="screen main-screen hidden">         
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <div>
+                        <h2 class="greeting">Good morning, <span id="greeting-name"></span>!</h2>
+                        <p class="location-date">THIMPHU • BHUTAN • <span id="current-date"></span></p>
+                    </div>
+                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                </div>
+                
+                <div id="quote-container" class="quote-card">
+                    <p id="daily-quote">"Loading inspiration..."</p>
+                </div>
             </header>
 
-            <form id="planning-form">
-                <h3>Daily Planning Quiz</h3>
+            <form id="planning-form" class="planning-form">
+                <h3 class="section-title">Daily Planning</h3>
                 
-                <!-- MODIFIED: Mood and Interactive Task List -->
-<label>How are you feeling today?</label>
-<div class="mood-container">
-    <button type="button" class="mood-btn" onclick="setMood('🔥', this)">Focused</button>
-    <button type="button" class="mood-btn" onclick="setMood('😊', this)">Happy</button>
-    <button type="button" class="mood-btn" onclick="setMood('😴', this)">Tired</button>
-</div>
-<input type="hidden" id="selected-mood" value="😊">
-
-<label>1. What are your specific tasks today?</label>
-<div class="task-input-group">
-    <input type="text" id="task-input" placeholder="Enter a task and press Add">
-    <button type="button" onclick="addTask()" style="width: auto; margin: 0;">Add</button>
-</div>
-<ul id="task-checklist"></ul>
-<!-- We keep this hidden to store tasks for your existing save logic -->
-<input type="hidden" id="tasks">
-                <label>2. How many hours are you going to spend on work today?</label>
-                <input type="number" id="total-hours" min="1" max="12" value="6" required>
-
-                <label>3. How many blocks do you want to divide your work into?</label>
-                <input type="number" id="blocks" min="1" max="8" value="3" required>
-
-                <label>4. Divide your work into blocks:</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="block-tasks" placeholder="e.g., Block 1 (2h), Block 2 (2h), Block 3 (2h)" required>
-                    <button type="button" onclick="autoGenerateBlocksManual()" style="flex: 0 0 auto; width: auto; padding: 12px 20px;">Auto-Generate</button>
+                <!-- Mood Section -->
+                <div class="form-section">
+                    <label class="form-label">How are you feeling today?</label>
+                    <div class="mood-container">
+                        <button type="button" class="mood-btn" data-mood="🔥" onclick="setMood('🔥', this)">
+                            <span class="mood-emoji">🔥</span>
+                            <span class="mood-text">Focused</span>
+                        </button>
+                        <button type="button" class="mood-btn" data-mood="😊" onclick="setMood('😊', this)">
+                            <span class="mood-emoji">😊</span>
+                            <span class="mood-text">Happy</span>
+                        </button>
+                        <button type="button" class="mood-btn" data-mood="😴" onclick="setMood('😴', this)">
+                            <span class="mood-emoji">😴</span>
+                            <span class="mood-text">Tired</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="selected-mood" value="😊">
                 </div>
 
-                <label>5. Rate your productivity at the end of the day (1-10):</label>
-                <input type="range" id="productivity" min="1" max="10" value="7">
-                <span id="rating-value">7</span>/10
+                <!-- Tasks Section -->
+                <div class="form-section">
+                    <label class="form-label">What are your specific tasks today?</label>
+                    <div class="task-input-group">
+                        <input type="text" id="task-input" placeholder="Add a task..." class="form-input">
+                        <button type="button" onclick="addTask()" class="btn btn-icon">+</button>
+                    </div>
+                    <ul id="task-checklist" class="task-list"></ul>
+                    <input type="hidden" id="tasks">
+                </div>
 
-                <label>6. Comments / Reflections:</label>
-                <textarea id="comments" rows="4" placeholder="What went well? Any distractions?"></textarea>
+                <!-- Time Blocks -->
+                <div class="form-section">
+                    <label class="form-label">How many hours will you work today?</label>
+                    <input type="number" id="total-hours" class="form-input time-input" min="1" max="12" value="6" required>
+                </div>
 
-                <button type="button" onclick="saveEntry()">Save Today's Entry</button>
+                <div class="form-section">
+                    <label class="form-label">Divide work into how many blocks?</label>
+                    <input type="number" id="blocks" class="form-input time-input" min="1" max="8" value="3" required>
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">Your work blocks</label>
+                    <div class="block-input-wrapper">
+                        <input type="text" id="block-tasks" placeholder="Auto-generated blocks will appear here" class="form-input" required>
+                        <button type="button" onclick="autoGenerateBlocksManual()" class="btn btn-icon">⚡</button>
+                    </div>
+                </div>
+
+                <!-- Productivity Rating -->
+                <div class="form-section">
+                    <label class="form-label">Rate your expected productivity</label>
+                    <div class="rating-wrapper">
+                        <input type="range" id="productivity" class="range-slider" min="1" max="10" value="7">
+                        <span id="rating-value" class="rating-display">7</span><span class="rating-max">/10</span>
+                    </div>
+                </div>
+
+                <!-- Comments -->
+                <div class="form-section">
+                    <label class="form-label">Comments & Reflections</label>
+                    <textarea id="comments" class="form-input form-textarea" rows="4" placeholder="What went well? Any distractions?"></textarea>
+                </div>
+
+                <button type="button" onclick="saveEntry()" class="btn btn-primary btn-large">Save Today's Entry</button>
             </form>
 
-            <div id="summary" class="hidden">
-                <h3>Today's Plan Summary</h3>
-                <p><strong>Tasks:</strong> <span id="sum-tasks"></span></p>
-                <p><strong>Block Tasks:</strong> <span id="sum-block-tasks"></span></p>
-                <p><strong>Total Hours:</strong> <span id="sum-hours"></span></p>
-                <p><strong>Blocks:</strong> <span id="sum-blocks"></span> × <span id="sum-per-block"></span> hours</p>
-                <p><strong>Productivity Rating:</strong> <span id="sum-rating"></span>/10</p>
-                <p><strong>Your Notes:</strong> <span id="sum-comments"></span></p>
+            <!-- Summary Card -->
+            <div id="summary" class="summary-card hidden">
+                <h3 class="section-title">Today's Plan Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="summary-label">Tasks</span>
+                        <p id="sum-tasks" class="summary-value"></p>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Work Duration</span>
+                        <p id="sum-hours" class="summary-value"></p>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Blocks</span>
+                        <p class="summary-value"><span id="sum-blocks"></span> × <span id="sum-per-block"></span>h</p>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Productivity Goal</span>
+                        <p id="sum-rating" class="summary-value"></p>
+                    </div>
+                </div>
+                <div class="summary-blocks">
+                    <span class="summary-label">Block Schedule</span>
+                    <p id="sum-block-tasks" class="summary-value"></p>
+                </div>
+                <div class="summary-blocks">
+                    <span class="summary-label">Notes</span>
+                    <p id="sum-comments" class="summary-value"></p>
+                </div>
             </div>
 
-            <div class="reflection">
-                <h3>What I Learned Today</h3>
-                <ul id="lessons-list">
+            <!-- Lessons Section -->
+            <div class="reflection-card">
+                <h3 class="section-title">What I Learned Today</h3>
+                <ul id="lessons-list" class="lessons-list">
                     <!-- Populated by JS -->
                 </ul>
             </div>
