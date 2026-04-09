@@ -1,3 +1,46 @@
+// New Features Logic
+let taskList = [];
+
+function setMood(mood, btn) {
+    document.getElementById('selected-mood').value = mood;
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function addTask() {
+    const input = document.getElementById('task-input');
+    const val = input.value.trim();
+    if (val) {
+        taskList.push(val);
+        updateTaskListUI();
+        input.value = '';
+        // Sync with your original 'tasks' ID so your saveEntry() function still works
+        document.getElementById('tasks').value = taskList.join(', ');
+    }
+}
+
+function updateTaskListUI() {
+    const list = document.getElementById('task-checklist');
+    list.innerHTML = taskList.map((t, i) => `
+        <li>
+            ${t} 
+            <span class="delete-task" onclick="removeTask(${i})">✕</span>
+        </li>
+    `).join('');
+}
+
+function removeTask(index) {
+    taskList.splice(index, 1);
+    updateTaskListUI();
+    document.getElementById('tasks').value = taskList.join(', ');
+}
+
+const quotes = [
+    "Focus on being productive instead of busy.",
+    "The secret of getting ahead is getting started.",
+    "Your mind is for having ideas, not holding them.",
+    "Done is better than perfect."
+];
 let currentUser = "Penjor";
 
 function autoGenerateBlocksManual() {
@@ -22,7 +65,7 @@ function login() {
     
     document.getElementById("greeting-name").textContent = currentUser;
     document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
-    
+    document.getElementById('daily-quote').textContent = quotes[Math.floor(Math.random() * quotes.length)];
     // Auto-generate blocks on login
     setTimeout(() => {
         autoGenerateBlocksManual();
@@ -63,16 +106,20 @@ function logout() {
 }
 
 function saveEntry() {
+    // 1. Get all the values from the form
     const tasks = document.getElementById("tasks").value.trim();
     const totalHours = document.getElementById("total-hours").value;
     const blockTasks = document.getElementById("block-tasks").value.trim();
     const blocks = document.getElementById("blocks").value;
     const productivity = document.getElementById("productivity").value;
     const comments = document.getElementById("comments").value.trim();
+    
+    // --- ADDED THIS LINE: Get the mood value ---
+    const mood = document.getElementById("selected-mood").value; 
 
-    // Validation
+    // 2. Validation: Make sure they entered tasks
     if (!tasks) {
-        alert("❌ Please tell us what you are going to do today.");
+        alert("❌ Please add at least one task today.");
         return;
     }
     if (!blockTasks) {
@@ -80,10 +127,10 @@ function saveEntry() {
         return;
     }
 
-    // Calculate hours per block
+    // 3. Calculate hours per block
     const hoursPerBlock = (parseFloat(totalHours) / parseInt(blocks)).toFixed(1);
 
-    // Show summary with all details
+    // 4. Show summary on screen
     document.getElementById("sum-tasks").textContent = tasks;
     document.getElementById("sum-block-tasks").textContent = blockTasks;
     document.getElementById("sum-hours").textContent = totalHours;
@@ -94,35 +141,36 @@ function saveEntry() {
 
     document.getElementById("summary").classList.remove("hidden");
 
-    // Feedback based on rating
+    // 5. Generate feedback lessons
     let feedback = "";
     if (productivity >= 9) feedback = "Excellent! You were highly focused today.";
     else if (productivity >= 6) feedback = "Good job! Small improvements can make it even better.";
     else if (productivity >= 4) feedback = "Fair. Try reducing distractions tomorrow.";
     else feedback = "Room for improvement. Planning and focus will help.";
 
-    // Lessons learned
     const lessonsHTML = `
+        <li><strong>Morning Mood:</strong> You started the day feeling ${mood}</li>
         <li><strong>Planning the Day:</strong> You planned your tasks and time blocks clearly.</li>
-        <li><strong>Block Tasks:</strong> ${blockTasks}</li>
-        <li><strong>Staying Focused:</strong> You worked on ${tasks} in structured blocks.</li>
-        <li><strong>Rating Your Productivity:</strong> You rated yourself ${productivity}/10 and added reflections.</li>
-        <li><strong>Getting Better Over Time:</strong> ${feedback}</li>
+        <li><strong>Focus Area:</strong> You worked on: ${tasks}</li>
+        <li><strong>Growth:</strong> ${feedback}</li>
     `;
     document.getElementById("lessons-list").innerHTML = lessonsHTML;
 
-    // Save to localStorage
+    // 6. SAVE TO HISTORY (This is the part you were looking for)
     let history = JSON.parse(localStorage.getItem("productivityHistory") || "[]");
+    
     history.push({
         date: new Date().toLocaleDateString(),
         tasks: tasks,
+        mood: mood,           // <--- ADDED THIS LINE
         blockTasks: blockTasks,
         productivity: productivity,
         comments: comments
     });
+    
     localStorage.setItem("productivityHistory", JSON.stringify(history));
 
-    // Scroll to summary
+    // Scroll to summary so the user sees it
     setTimeout(() => {
         document.getElementById("summary").scrollIntoView({ behavior: "smooth" });
     }, 200);

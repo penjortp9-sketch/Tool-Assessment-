@@ -131,3 +131,49 @@ input[type="range"]::-webkit-slider-thumb:hover {
     width: 24px;
     height: 24px;
 }
+/* New Features Styling */
+.mood-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.mood-btn {
+    background: #f1f8e9;
+    color: #00695c;
+    border: 2px solid #00695c;
+    cursor: pointer;
+    flex: 1;
+}
+
+.mood-btn.active {
+    background: #00695c;
+    color: white;
+}
+
+.task-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+#task-checklist {
+    list-style: none;
+    padding: 0;
+}
+
+#task-checklist li {
+    background: #f9f9f9;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid #00695c;
+}
+
+.delete-task {
+    color: red;
+    cursor: pointer;
+    font-weight: bold;
+}
