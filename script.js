@@ -23,17 +23,15 @@ function login() {
     document.getElementById("greeting-name").textContent = currentUser;
     document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
     
-    // Auto-calculate hours per block
+    // Auto-generate blocks on login
+    setTimeout(() => {
+        autoGenerateBlocksManual();
+    }, 100);
+    
+    // Setup event listeners
     const totalHoursInput = document.getElementById("total-hours");
     const blocksInput = document.getElementById("blocks");
-    const perBlockInput = document.getElementById("hours-per-block");
     const blockTasksInput = document.getElementById("block-tasks");
-    
-    function updatePerBlock() {
-        const total = parseFloat(totalHoursInput.value) || 0;
-        const blocks = parseInt(blocksInput.value) || 1;
-        perBlockInput.value = (total / blocks).toFixed(1);
-    }
     
     function autoGenerateBlocks() {
         const total = parseFloat(totalHoursInput.value) || 0;
@@ -47,8 +45,7 @@ function login() {
         blockTasksInput.value = blockLabels.join(", ");
     }
     
-    totalHoursInput.addEventListener("input", updatePerBlock);
-    blocksInput.addEventListener("input", updatePerBlock);
+    totalHoursInput.addEventListener("input", autoGenerateBlocks);
     blocksInput.addEventListener("input", autoGenerateBlocks);
     
     // Update rating live
@@ -62,27 +59,31 @@ function login() {
 function logout() {
     document.getElementById("main-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
+    document.getElementById("summary").classList.add("hidden");
 }
 
 function saveEntry() {
-    const tasks = document.getElementById("tasks").value;
+    const tasks = document.getElementById("tasks").value.trim();
     const totalHours = document.getElementById("total-hours").value;
-    const blockTasks = document.getElementById("block-tasks").value;
+    const blockTasks = document.getElementById("block-tasks").value.trim();
     const blocks = document.getElementById("blocks").value;
-    const hoursPerBlock = document.getElementById("hours-per-block").value;
     const productivity = document.getElementById("productivity").value;
-    const comments = document.getElementById("comments").value;
+    const comments = document.getElementById("comments").value.trim();
 
+    // Validation
     if (!tasks) {
-        alert("Please tell us what you are going to do today.");
+        alert("❌ Please tell us what you are going to do today.");
         return;
     }
     if (!blockTasks) {
-    alert("Please write your each block task.");
-    return;
-}
+        alert("❌ Please divide your work into blocks (use Auto-Generate button).");
+        return;
+    }
 
-    // Show summary
+    // Calculate hours per block
+    const hoursPerBlock = (parseFloat(totalHours) / parseInt(blocks)).toFixed(1);
+
+    // Show summary with all details
     document.getElementById("sum-tasks").textContent = tasks;
     document.getElementById("sum-block-tasks").textContent = blockTasks;
     document.getElementById("sum-hours").textContent = totalHours;
@@ -100,7 +101,7 @@ function saveEntry() {
     else if (productivity >= 4) feedback = "Fair. Try reducing distractions tomorrow.";
     else feedback = "Room for improvement. Planning and focus will help.";
 
-    // Lessons learned (as in your story)
+    // Lessons learned
     const lessonsHTML = `
         <li><strong>Planning the Day:</strong> You planned your tasks and time blocks clearly.</li>
         <li><strong>Block Tasks:</strong> ${blockTasks}</li>
@@ -110,7 +111,7 @@ function saveEntry() {
     `;
     document.getElementById("lessons-list").innerHTML = lessonsHTML;
 
-    // Save to localStorage (history)
+    // Save to localStorage
     let history = JSON.parse(localStorage.getItem("productivityHistory") || "[]");
     history.push({
         date: new Date().toLocaleDateString(),
@@ -121,7 +122,10 @@ function saveEntry() {
     });
     localStorage.setItem("productivityHistory", JSON.stringify(history));
 
-    alert("Entry saved successfully! Great work today, Penjor. 🌱\n\nYou can check your past entries in the browser console (F12).");
+    // Scroll to summary
+    setTimeout(() => {
+        document.getElementById("summary").scrollIntoView({ behavior: "smooth" });
+    }, 200);
 }
 
 // Allow pressing Enter in login

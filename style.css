@@ -1,9 +1,8 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-image: url('download (1).jpg');
-    background-size: cover;
-    background-position: center;
+    background: linear-gradient(135deg, #00695c 0%, #004d40 50%, #1b5e20 100%);
     background-attachment: fixed;
+    min-height: 100vh;
     margin: 0;
     padding: 20px;
     color: #333;
@@ -72,4 +71,63 @@ header {
     padding: 15px;
     background: #f1f8e9;
     border-radius: 8px;
+}
+/* Container Card */
+.container {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    animation: slideIn 0.5s ease-out;
+}
+
+/* Inputs with focus effects */
+input:focus, textarea:focus {
+    border-color: #00695c;
+    box-shadow: 0 0 0 3px rgba(0, 105, 92, 0.1);
+}
+
+/* Buttons with gradient and shadow */
+button {
+    background: linear-gradient(135deg, #00695c 0%, #004d40 100%);
+    box-shadow: 0 4px 15px rgba(0, 105, 92, 0.3);
+}
+
+button:hover {
+    box-shadow: 0 8px 25px rgba(0, 105, 92, 0.4);
+    transform: translateY(-2px);
+}
+
+/* Reflection card with left border */
+.reflection {
+    border-left: 4px solid #00695c;
+    box-shadow: 0 4px 15px rgba(0, 105, 92, 0.1);
+}
+
+/* Input Focus States */
+input:focus, textarea:focus {
+    outline: none;
+    border-color: #00695c;
+    box-shadow: 0 0 0 4px rgba(0, 105, 92, 0.15), 
+                inset 0 1px 3px rgba(0, 105, 92, 0.05);
+    background-color: #fafffe;
+    transform: translateY(-1px);
+}
+
+/* Input Hover State */
+input:hover:not(:focus), textarea:hover:not(:focus) {
+    border-color: #00695c;
+    box-shadow: 0 2px 8px rgba(0, 105, 92, 0.1);
+}
+
+/* Range Input Slider */
+input[type="range"]::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #00695c 0%, #004d40 100%);
+    box-shadow: 0 2px 8px rgba(0, 105, 92, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    width: 24px;
+    height: 24px;
 }
