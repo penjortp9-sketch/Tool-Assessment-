@@ -1,5 +1,17 @@
 let currentUser = "Penjor";
 
+function autoGenerateBlocksManual() {
+    const total = parseFloat(document.getElementById("total-hours").value) || 0;
+    const blocks = parseInt(document.getElementById("blocks").value) || 1;
+    const hoursPerBlock = (total / blocks).toFixed(1);
+    
+    let blockLabels = [];
+    for (let i = 1; i <= blocks; i++) {
+        blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
+    }
+    document.getElementById("block-tasks").value = blockLabels.join(", ");
+}
+
 function login() {
     const name = document.getElementById("username").value.trim();
     if (name) {
@@ -15,6 +27,7 @@ function login() {
     const totalHoursInput = document.getElementById("total-hours");
     const blocksInput = document.getElementById("blocks");
     const perBlockInput = document.getElementById("hours-per-block");
+    const blockTasksInput = document.getElementById("block-tasks");
     
     function updatePerBlock() {
         const total = parseFloat(totalHoursInput.value) || 0;
@@ -22,8 +35,21 @@ function login() {
         perBlockInput.value = (total / blocks).toFixed(1);
     }
     
+    function autoGenerateBlocks() {
+        const total = parseFloat(totalHoursInput.value) || 0;
+        const blocks = parseInt(blocksInput.value) || 1;
+        const hoursPerBlock = (total / blocks).toFixed(1);
+        
+        let blockLabels = [];
+        for (let i = 1; i <= blocks; i++) {
+            blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
+        }
+        blockTasksInput.value = blockLabels.join(", ");
+    }
+    
     totalHoursInput.addEventListener("input", updatePerBlock);
     blocksInput.addEventListener("input", updatePerBlock);
+    blocksInput.addEventListener("input", autoGenerateBlocks);
     
     // Update rating live
     const ratingSlider = document.getElementById("productivity");
@@ -99,6 +125,6 @@ function saveEntry() {
 }
 
 // Allow pressing Enter in login
-document.getElementById("password").addEventListener("keypress", function(e) {
+document.getElementById("password").addEventListener("keypress", function(e) {         
     if (e.key === "Enter") login();
 });

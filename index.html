@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Productive Self-Assessment Tool</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">     
 </head>
 <body>
     <div class="container">
@@ -18,7 +18,7 @@
         </div>
 
         <!-- Main Dashboard -->
-        <div id="main-screen" class="screen hidden">
+        <div id="main-screen" class="screen hidden">         
             <header>
                 <h2>Good morning, <span id="greeting-name"></span>!</h2>
                 <p>THIMPHU • BHUTAN • <span id="current-date"></span></p>
@@ -34,20 +34,20 @@
                 <label>2. How many hours are you going to spend on work today?</label>
                 <input type="number" id="total-hours" min="1" max="12" value="6" required>
 
-                <label>3. Write your each block task?</label>
-                <input type="text" id="block-tasks" placeholder="e.g., 1st block( website ), 2nd (tools)" required>
-
-                <label>4. How many blocks do you want to divide your work into?</label>
+                <label>3. How many blocks do you want to divide your work into?</label>
                 <input type="number" id="blocks" min="1" max="8" value="3" required>
- 
-                <label>5. How many hours per block?</label>
-                <input type="number" id="hours-per-block" min="0.5" step="0.5" value="2" required>
 
-                <label>6. At the end of the day, rate your productivity (1-10)</label>
+                <label>4. Divide your work into blocks:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="block-tasks" placeholder="e.g., Block 1 (2h), Block 2 (2h), Block 3 (2h)" required>
+                    <button type="button" onclick="autoGenerateBlocksManual()" style="flex: 0 0 auto; width: auto; padding: 12px 20px;">Auto-Generate</button>
+                </div>
+
+                <label>5. Rate your productivity at the end of the day (1-10):</label>
                 <input type="range" id="productivity" min="1" max="10" value="7">
                 <span id="rating-value">7</span>/10
 
-                <label>Comments / Reflections:</label>
+                <label>6. Comments / Reflections:</label>
                 <textarea id="comments" rows="4" placeholder="What went well? Any distractions?"></textarea>
 
                 <button type="button" onclick="saveEntry()">Save Today's Entry</button>
