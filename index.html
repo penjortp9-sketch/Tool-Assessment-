@@ -44,7 +44,10 @@
                         <h2 class="greeting">Good morning, <span id="greeting-name"></span>!</h2>
                         <p class="location-date">THIMPHU • BHUTAN • <span id="current-date"></span></p>
                     </div>
-                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                    <div class="header-buttons">
+                        <button onclick="showHistoryScreen()" class="btn btn-secondary">📊 History</button>
+                        <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                    </div>
                 </div>
                 
                 <div id="quote-container" class="quote-card">
@@ -160,6 +163,97 @@
                 <ul id="lessons-list" class="lessons-list">
                     <!-- Populated by JS -->
                 </ul>
+            </div>
+        </div>
+
+        <!-- History Screen -->
+        <div id="history-screen" class="screen history-screen hidden">
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <div>
+                        <h2 class="greeting">📊 Your Results History</h2>
+                        <p class="location-date">Track your productivity journey</p>
+                    </div>
+                    <div class="header-buttons">
+                        <button onclick="clearAllHistory()" class="btn btn-secondary btn-danger">🗑️ Clear All</button>
+                        <button onclick="backToDashboard()" class="btn btn-secondary">← Back</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="history-container">
+                <!-- Statistics Summary -->
+                <div class="stats-summary">
+                    <h3 class="section-title">Your Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <div class="stat-content">
+                                <span class="stat-label">Total<br>Entries</span>
+                                <span class="stat-number" id="stat-entries">0</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⭐</div>
+                            <div class="stat-content">
+                                <span class="stat-label">Avg<br>Productivity</span>
+                                <span class="stat-number" id="stat-avg-productivity">0</span><span class="stat-unit">/10</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-content">
+                                <span class="stat-label">Avg Work<br>Hours</span>
+                                <span class="stat-number" id="stat-avg-hours">0</span><span class="stat-unit">h</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🔥</div>
+                            <div class="stat-content">
+                                <span class="stat-label">Most<br>Common<br>Mood</span>
+                                <span class="stat-number" id="stat-mood">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Options -->
+                <div class="filter-section">
+                    <h3 class="section-title">Filter Results</h3>
+                    <div class="filter-controls">
+                        <select id="mood-filter" class="filter-input" onchange="filterHistory()">
+                            <option value="">All Moods</option>
+                            <option value="🔥">🔥 Focused</option>
+                            <option value="😊">😊 Happy</option>
+                            <option value="😴">😴 Tired</option>
+                        </select>
+                        <select id="productivity-filter" class="filter-input" onchange="filterHistory()">
+                            <option value="">All Productivity Levels</option>
+                            <option value="high">High (8-10)</option>
+                            <option value="medium">Medium (5-7)</option>
+                            <option value="low">Low (1-4)</option>
+                        </select>
+                        <button onclick="resetFilters()" class="btn btn-secondary">Reset Filters</button>
+                    </div>
+                </div>
+
+                <!-- History List -->
+                <div class="history-list-container">
+                    <h3 class="section-title">Entries</h3>
+                    <div id="history-list" class="history-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Detailed View -->
+    <div id="detail-modal" class="modal hidden">
+        <div class="modal-content">
+            <button onclick="closeDetailModal()" class="modal-close">×</button>
+            <div id="detail-content" class="detail-content">
+                <!-- Populated by JS -->
             </div>
         </div>
     </div>
