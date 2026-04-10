@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Productive Self-Assessment Tool</title>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">     
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="background-pattern"></div>
@@ -214,6 +215,40 @@
                                 <span class="stat-number" id="stat-mood">-</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-section">
+                    <h3 class="section-title">📊 Analytics Dashboard</h3>
+                    
+                    <!-- Chart Tabs -->
+                    <div class="chart-tabs">
+                        <button class="chart-tab active" onclick="switchChartTab('productivity')">📈 Productivity Trend</button>
+                        <button class="chart-tab" onclick="switchChartTab('mood')">😊 Mood Distribution</button>
+                        <button class="chart-tab" onclick="switchChartTab('heatmap')">🔥 Productivity Heatmap</button>
+                        <button class="chart-tab" onclick="switchChartTab('correlation')">📉 Hours vs Productivity</button>
+                    </div>
+                    
+                    <!-- Chart Containers -->
+                    <div id="productivity-chart-container" class="chart-container active">
+                        <canvas id="productivityTrendChart"></canvas>
+                        <div class="chart-insight" id="trend-insight"></div>
+                    </div>
+                    
+                    <div id="mood-chart-container" class="chart-container">
+                        <canvas id="moodDistributionChart"></canvas>
+                        <div class="chart-insight" id="mood-insight"></div>
+                    </div>
+                    
+                    <div id="heatmap-chart-container" class="chart-container">
+                        <div id="heatmap-calendar" class="heatmap-calendar"></div>
+                        <div class="chart-insight" id="heatmap-insight"></div>
+                    </div>
+                    
+                    <div id="correlation-chart-container" class="chart-container">
+                        <canvas id="correlationChart"></canvas>
+                        <div class="chart-insight" id="correlation-insight"></div>
                     </div>
                 </div>
 

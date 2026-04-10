@@ -688,6 +688,144 @@ body {
     margin-left: 2px;
 }
 
+/* ===== CHARTS SECTION ===== */
+.charts-section {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 25px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+    animation: fadeIn 0.6s ease-out;
+}
+
+.chart-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 15px;
+}
+
+.chart-tab {
+    padding: 10px 20px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.chart-tab:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.chart-tab.active {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(27, 77, 62, 0.3);
+}
+
+.chart-container {
+    display: none;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.chart-container.active {
+    display: block;
+}
+
+.chart-container canvas {
+    max-height: 400px;
+    margin-bottom: 20px;
+}
+
+.chart-insight {
+    background: linear-gradient(135deg, rgba(27, 77, 62, 0.05) 0%, rgba(212, 165, 116, 0.05) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    border-left: 4px solid var(--primary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-dark);
+}
+
+/* Heatmap Calendar */
+.heatmap-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding: 20px;
+    background: var(--bg-light);
+    border-radius: 12px;
+    overflow-x: auto;
+    min-width: 300px;
+}
+
+.heatmap-day {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: var(--transition);
+    cursor: pointer;
+    position: relative;
+}
+
+.heatmap-day:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.heatmap-day .day-date {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.heatmap-legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+/* Productivity Levels */
+.productivity-1 { background: #FEE2E2; color: #991B1B; }
+.productivity-2 { background: #FEE2E2; color: #991B1B; }
+.productivity-3 { background: #FED7AA; color: #9A3412; }
+.productivity-4 { background: #FED7AA; color: #9A3412; }
+.productivity-5 { background: #FEF3C7; color: #92400E; }
+.productivity-6 { background: #FEF3C7; color: #92400E; }
+.productivity-7 { background: #D1FAE5; color: #065F46; }
+.productivity-8 { background: #A7F3D0; color: #065F46; }
+.productivity-9 { background: #6EE7B7; color: #064E3B; }
+.productivity-10 { background: #34D399; color: #064E3B; }
+
 /* ===== FILTER SECTION ===== */
 .filter-section {
     background: var(--bg-light);
@@ -1068,6 +1206,28 @@ body {
         width: 95%;
         padding: 20px;
     }
+    
+    .charts-section {
+        padding: 20px;
+    }
+    
+    .chart-tab {
+        padding: 8px 16px;
+        font-size: 0.8rem;
+    }
+    
+    .heatmap-calendar {
+        gap: 4px;
+    }
+    
+    .heatmap-day {
+        padding: 8px 4px;
+        font-size: 0.7rem;
+    }
+    
+    .chart-container canvas {
+        max-height: 300px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1121,5 +1281,9 @@ body {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+    }
+    
+    .heatmap-calendar {
+        grid-template-columns: repeat(4, 1fr);
     }
 }

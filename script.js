@@ -8,6 +8,11 @@ let taskList = [];
 let currentUser = "Penjor";
 let filteredHistoryData = [];
 
+// Chart instances
+let productivityChart = null;
+let moodChart = null;
+let correlationChart = null;
+
 // Inspirational Quotes
 const quotes = [
     "Focus on being productive instead of busy.",
@@ -49,7 +54,7 @@ function updateTaskListUI() {
     const list = document.getElementById('task-checklist');
     list.innerHTML = taskList.map((t, i) => `
         <li>
-            <span>${t}</span>
+            <span>${escapeHtml(t)}</span>
             <span class="delete-task" onclick="removeTask(${i})">✕</span>
         </li>
     `).join('');
@@ -59,6 +64,13 @@ function removeTask(index) {
     taskList.splice(index, 1);
     updateTaskListUI();
     document.getElementById('tasks').value = taskList.join(', ');
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ===== TIME BLOCK MANAGEMENT =====
@@ -266,9 +278,9 @@ function generateLessons(mood, tasks, productivity, comments) {
 
     const lessonsHTML = `
         <li><strong>🌅 Morning Mood:</strong> You started the day feeling ${moodEmoji} (${moodText})</li>
-        <li><strong>📋 Plan Execution:</strong> You worked on: ${tasks}</li>
+        <li><strong>📋 Plan Execution:</strong> You worked on: ${escapeHtml(tasks)}</li>
         <li><strong>📊 Progress:</strong> ${feedback}</li>
-        <li><strong>${icon} Key Takeaway:</strong> ${comments || "Every day is a chance to improve your productivity."}</li>
+        <li><strong>${icon} Key Takeaway:</strong> ${escapeHtml(comments) || "Every day is a chance to improve your productivity."}</li>
     `;
     
     document.getElementById("lessons-list").innerHTML = lessonsHTML;
@@ -293,6 +305,14 @@ function showHistoryScreen() {
     
     // Load and display history
     loadHistoryData();
+    
+    // Load charts after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        loadProductivityTrendChart();
+        loadMoodDistributionChart();
+        loadHeatmapCalendar();
+        loadCorrelationChart();
+    }, 100);
 }
 
 // ===== BACK TO DASHBOARD =====
@@ -388,7 +408,7 @@ function displayHistoryList(historyData) {
                             <span class="stat-text">${entry.blocks} blocks</span>
                         </div>
                     </div>
-                    <p class="history-tasks"><strong>Tasks:</strong> ${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p>
+                    <p class="history-tasks"><strong>Tasks:</strong> ${escapeHtml(entry.tasks.substring(0, 60))}${entry.tasks.length > 60 ? '...' : ''}</p>
                 </div>
                 
                 <div class="history-item-action">
@@ -406,20 +426,16 @@ function filterHistory() {
     
     let history = getHistory().reverse();
     
-    // Apply filters
     if (moodFilter) {
         history = history.filter(h => h.mood === moodFilter);
     }
     
-    if (productivityFilter) {
-        const prod = parseInt(history[0]?.productivity) || 7;
-        if (productivityFilter === 'high') {
-            history = history.filter(h => parseInt(h.productivity) >= 8);
-        } else if (productivityFilter === 'medium') {
-            history = history.filter(h => parseInt(h.productivity) >= 5 && parseInt(h.productivity) < 8);
-        } else if (productivityFilter === 'low') {
-            history = history.filter(h => parseInt(h.productivity) < 5);
-        }
+    if (productivityFilter === 'high') {
+        history = history.filter(h => parseInt(h.productivity) >= 8);
+    } else if (productivityFilter === 'medium') {
+        history = history.filter(h => parseInt(h.productivity) >= 5 && parseInt(h.productivity) < 8);
+    } else if (productivityFilter === 'low') {
+        history = history.filter(h => parseInt(h.productivity) < 5);
     }
     
     filteredHistoryData = history;
@@ -469,17 +485,17 @@ function showDetailModal(entryId) {
         
         <div class="detail-section">
             <h3>📋 Tasks</h3>
-            <p>${entry.tasks}</p>
+            <p>${escapeHtml(entry.tasks)}</p>
         </div>
         
         <div class="detail-section">
             <h3>⏱️ Work Blocks</h3>
-            <p>${entry.blockTasks}</p>
+            <p>${escapeHtml(entry.blockTasks)}</p>
         </div>
         
         <div class="detail-section">
             <h3>📝 Notes</h3>
-            <p>${entry.comments || 'No notes added.'}</p>
+            <p>${escapeHtml(entry.comments) || 'No notes added.'}</p>
         </div>
         
         <div class="detail-actions">
@@ -546,6 +562,550 @@ function showAlert(message, type = "info") {
     }, 2500);
 }
 
+// ============================================
+// CHARTS AND VISUALIZATIONS
+// ============================================
+
+// Chart Tab Switching
+function switchChartTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.chart-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Hide all chart containers
+    document.querySelectorAll('.chart-container').forEach(container => {
+        container.classList.remove('active');
+    });
+    
+    // Show selected chart container
+    document.getElementById(`${tabName}-chart-container`).classList.add('active');
+    
+    // Refresh chart if needed
+    if (tabName === 'productivity') {
+        loadProductivityTrendChart();
+    } else if (tabName === 'mood') {
+        loadMoodDistributionChart();
+    } else if (tabName === 'heatmap') {
+        loadHeatmapCalendar();
+    } else if (tabName === 'correlation') {
+        loadCorrelationChart();
+    }
+}
+
+// 1. Productivity Trend Line Chart
+function loadProductivityTrendChart() {
+    const history = getHistory();
+    if (history.length === 0) {
+        document.getElementById('trend-insight').innerHTML = '📭 No data available. Start logging your productivity to see trends!';
+        return;
+    }
+    
+    // Sort by date (oldest to newest)
+    const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    // Get last 30 days maximum for better visibility
+    const recentData = sorted.slice(-30);
+    
+    const labels = recentData.map(entry => {
+        const date = new Date(entry.timestamp);
+        return `${date.getMonth()+1}/${date.getDate()}`;
+    });
+    
+    const productivityData = recentData.map(entry => parseInt(entry.productivity));
+    const hoursData = recentData.map(entry => parseFloat(entry.totalHours));
+    
+    const ctx = document.getElementById('productivityTrendChart').getContext('2d');
+    
+    if (productivityChart) {
+        productivityChart.destroy();
+    }
+    
+    productivityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Productivity Rating',
+                    data: productivityData,
+                    borderColor: '#1B4D3E',
+                    backgroundColor: 'rgba(27, 77, 62, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#1B4D3E',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Hours Worked',
+                    data: hoursData,
+                    borderColor: '#D4A574',
+                    backgroundColor: 'rgba(212, 165, 116, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#D4A574',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: { family: 'Sora', size: 12 },
+                        usePointStyle: true,
+                        boxWidth: 10
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    padding: 12,
+                    titleFont: { family: 'Sora', size: 13 },
+                    bodyFont: { family: 'Sora', size: 12 },
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw;
+                            if (context.dataset.label.includes('Productivity')) {
+                                return `${label}: ${value}/10`;
+                            }
+                            return `${label}: ${value} hours`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Productivity Rating (/10)',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    min: 0,
+                    max: 10,
+                    ticks: { stepSize: 1 }
+                },
+                y1: {
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Hours Worked',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    grid: { drawOnChartArea: false }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    ticks: { maxRotation: 45, minRotation: 45 }
+                }
+            }
+        }
+    });
+    
+    // Generate insight
+    const avgProductivity = (productivityData.reduce((a,b) => a+b, 0) / productivityData.length).toFixed(1);
+    const trend = productivityData[productivityData.length-1] - productivityData[0];
+    const trendText = trend > 0 ? '↑ increasing' : trend < 0 ? '↓ decreasing' : '→ stable';
+    
+    document.getElementById('trend-insight').innerHTML = `
+        📊 <strong>Productivity Insight:</strong> Your average productivity is <strong>${avgProductivity}/10</strong> 
+        with a ${trendText} trend. ${trend > 0 ? 'Great job improving!' : trend < 0 ? 'Focus on consistency to boost your scores.' : 'Keep maintaining your steady performance!'}
+    `;
+}
+
+// 2. Mood Distribution Bar Chart
+function loadMoodDistributionChart() {
+    const history = getHistory();
+    if (history.length === 0) {
+        document.getElementById('mood-insight').innerHTML = '📭 No data available. Log your moods to see distribution!';
+        return;
+    }
+    
+    const moodMap = {
+        '🔥': { count: 0, label: '🔥 Focused' },
+        '😊': { count: 0, label: '😊 Happy' },
+        '😴': { count: 0, label: '😴 Tired' }
+    };
+    
+    history.forEach(entry => {
+        if (moodMap[entry.mood]) {
+            moodMap[entry.mood].count++;
+        }
+    });
+    
+    const labels = Object.values(moodMap).map(m => m.label);
+    const counts = Object.values(moodMap).map(m => m.count);
+    
+    // Calculate productivity by mood
+    const moodProductivity = {
+        '🔥': { sum: 0, count: 0 },
+        '😊': { sum: 0, count: 0 },
+        '😴': { sum: 0, count: 0 }
+    };
+    
+    history.forEach(entry => {
+        if (moodProductivity[entry.mood]) {
+            moodProductivity[entry.mood].sum += parseInt(entry.productivity);
+            moodProductivity[entry.mood].count++;
+        }
+    });
+    
+    const avgByMood = Object.keys(moodProductivity).map(mood => {
+        const data = moodProductivity[mood];
+        return data.count > 0 ? (data.sum / data.count).toFixed(1) : 0;
+    });
+    
+    const ctx = document.getElementById('moodDistributionChart').getContext('2d');
+    
+    if (moodChart) {
+        moodChart.destroy();
+    }
+    
+    moodChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Number of Days',
+                    data: counts,
+                    backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'],
+                    borderColor: ['#1B4D3E', '#2A7F6F', '#D4A574'],
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Avg Productivity (when in this mood)',
+                    data: avgByMood,
+                    type: 'line',
+                    borderColor: '#EF4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 6,
+                    pointBackgroundColor: '#EF4444',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { family: 'Sora', size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.dataset.label.includes('Number')) {
+                                return `${context.dataset.label}: ${context.raw} days`;
+                            }
+                            return `${context.dataset.label}: ${context.raw}/10`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Number of Days',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    ticks: { stepSize: 1 }
+                },
+                y1: {
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Average Productivity (/10)',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    min: 0,
+                    max: 10,
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+    
+    // Find best mood
+    let bestMood = '';
+    let bestAvg = 0;
+    Object.keys(moodProductivity).forEach(mood => {
+        const avg = moodProductivity[mood].count > 0 ? moodProductivity[mood].sum / moodProductivity[mood].count : 0;
+        if (avg > bestAvg) {
+            bestAvg = avg;
+            bestMood = mood === '🔥' ? 'Focused' : mood === '😊' ? 'Happy' : 'Tired';
+        }
+    });
+    
+    document.getElementById('mood-insight').innerHTML = `
+        😊 <strong>Mood Analysis:</strong> You feel ${bestMood} most productive (${bestAvg.toFixed(1)}/10). 
+        ${bestMood === 'Focused' ? 'Keep maintaining that focused state!' : bestMood === 'Happy' ? 'Happiness boosts your productivity!' : 'Try to get more rest for better results.'}
+    `;
+}
+
+// 3. Heatmap Calendar
+function loadHeatmapCalendar() {
+    const history = getHistory();
+    if (history.length === 0) {
+        document.getElementById('heatmap-insight').innerHTML = '📭 No data available. Start logging to see your productivity heatmap!';
+        return;
+    }
+    
+    // Create a map of dates to productivity
+    const productivityMap = new Map();
+    history.forEach(entry => {
+        const dateKey = new Date(entry.timestamp).toLocaleDateString();
+        productivityMap.set(dateKey, parseInt(entry.productivity));
+    });
+    
+    // Get last 90 days
+    const today = new Date();
+    const dates = [];
+    for (let i = 90; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        dates.push(date);
+    }
+    
+    const heatmapHTML = dates.map(date => {
+        const dateKey = date.toLocaleDateString();
+        const productivity = productivityMap.get(dateKey);
+        const dayNum = date.getDate();
+        const month = date.getMonth() + 1;
+        
+        if (productivity) {
+            const productivityClass = `productivity-${productivity}`;
+            return `
+                <div class="heatmap-day ${productivityClass}" title="${date.toLocaleDateString()}: ${productivity}/10">
+                    <div>${dayNum}/${month}</div>
+                    <div class="day-date">${date.toLocaleDateString('en', { weekday: 'short' })}</div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="heatmap-day" style="background: #F3F4F6; color: #9CA3AF;" title="${date.toLocaleDateString()}: No data">
+                    <div>${dayNum}/${month}</div>
+                    <div class="day-date">${date.toLocaleDateString('en', { weekday: 'short' })}</div>
+                </div>
+            `;
+        }
+    }).join('');
+    
+    const legendHTML = `
+        <div class="heatmap-legend">
+            <div class="legend-item"><div class="legend-color productivity-1"></div><span>Low (1-3)</span></div>
+            <div class="legend-item"><div class="legend-color productivity-4"></div><span>Below Avg (4-5)</span></div>
+            <div class="legend-item"><div class="legend-color productivity-6"></div><span>Average (6-7)</span></div>
+            <div class="legend-item"><div class="legend-color productivity-8"></div><span>Good (8-9)</span></div>
+            <div class="legend-item"><div class="legend-color productivity-10"></div><span>Excellent (10)</span></div>
+        </div>
+    `;
+    
+    document.getElementById('heatmap-calendar').innerHTML = heatmapHTML + legendHTML;
+    
+    // Calculate streak
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let tempStreak = 0;
+    
+    for (let i = 0; i <= 90; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateKey = date.toLocaleDateString();
+        
+        if (productivityMap.has(dateKey)) {
+            tempStreak++;
+            bestStreak = Math.max(bestStreak, tempStreak);
+            if (i === 0) currentStreak = tempStreak;
+        } else {
+            tempStreak = 0;
+        }
+    }
+    
+    document.getElementById('heatmap-insight').innerHTML = `
+        🔥 <strong>Consistency Tracker:</strong> Current streak: <strong>${currentStreak}</strong> days | Best streak: <strong>${bestStreak}</strong> days.
+        ${currentStreak >= 7 ? 'Amazing consistency! 🎉' : currentStreak >= 3 ? 'Great momentum! Keep going!' : 'Start building your streak today!'}
+    `;
+}
+
+// 4. Hours vs Productivity Correlation Chart (Scatter Plot)
+function loadCorrelationChart() {
+    const history = getHistory();
+    if (history.length === 0) {
+        document.getElementById('correlation-insight').innerHTML = '📭 No data available. Log entries to see correlation between hours and productivity!';
+        return;
+    }
+    
+    // Prepare scatter data
+    const scatterData = history.map(entry => ({
+        x: parseFloat(entry.totalHours),
+        y: parseInt(entry.productivity),
+        mood: entry.mood
+    }));
+    
+    // Group by mood for different colors
+    const focusedData = scatterData.filter(d => d.mood === '🔥');
+    const happyData = scatterData.filter(d => d.mood === '😊');
+    const tiredData = scatterData.filter(d => d.mood === '😴');
+    
+    // Calculate correlation coefficient
+    const hours = scatterData.map(d => d.x);
+    const productivity = scatterData.map(d => d.y);
+    const correlation = calculateCorrelation(hours, productivity);
+    
+    const ctx = document.getElementById('correlationChart').getContext('2d');
+    
+    if (correlationChart) {
+        correlationChart.destroy();
+    }
+    
+    correlationChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: '🔥 Focused',
+                    data: focusedData,
+                    backgroundColor: '#1B4D3E',
+                    borderColor: '#1B4D3E',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 12
+                },
+                {
+                    label: '😊 Happy',
+                    data: happyData,
+                    backgroundColor: '#2A7F6F',
+                    borderColor: '#2A7F6F',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 12
+                },
+                {
+                    label: '😴 Tired',
+                    data: tiredData,
+                    backgroundColor: '#D4A574',
+                    borderColor: '#D4A574',
+                    borderWidth: 1,
+                    pointRadius: 8,
+                    pointHoverRadius: 12
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { family: 'Sora', size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const point = context.raw;
+                            return [`Hours: ${point.x}h`, `Productivity: ${point.y}/10`, `Mood: ${point.mood}`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Hours Worked',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    min: 0,
+                    max: 12,
+                    ticks: { stepSize: 1 }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Productivity Rating (/10)',
+                        font: { family: 'Sora', size: 12 }
+                    },
+                    min: 0,
+                    max: 10,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+    
+    // Generate correlation insight
+    let correlationText = '';
+    let recommendation = '';
+    
+    if (Math.abs(correlation) < 0.3) {
+        correlationText = 'weak';
+        recommendation = 'Hours worked doesn\'t strongly predict your productivity. Focus on quality over quantity!';
+    } else if (Math.abs(correlation) < 0.7) {
+        correlationText = 'moderate';
+        recommendation = correlation > 0 ? 'More hours generally means higher productivity, but find your sweet spot.' : 'Working fewer hours might actually boost your productivity!';
+    } else {
+        correlationText = 'strong';
+        recommendation = correlation > 0 ? 'There\'s a strong positive relationship. Consider optimizing your workflow during peak hours.' : 'Strong inverse relationship - you\'re most productive with fewer hours. Take more breaks!';
+    }
+    
+    const direction = correlation > 0 ? 'positive' : 'negative';
+    
+    document.getElementById('correlation-insight').innerHTML = `
+        📈 <strong>Correlation Analysis:</strong> ${correlationText} ${direction} correlation (r = ${correlation.toFixed(2)}) between hours worked and productivity.
+        <br><br>💡 <strong>Recommendation:</strong> ${recommendation}
+    `;
+}
+
+// Helper function to calculate correlation coefficient
+function calculateCorrelation(x, y) {
+    const n = x.length;
+    if (n < 2) return 0;
+    
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+    const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+    const sumY2 = y.reduce((sum, yi) => sum + yi * yi, 0);
+    
+    const numerator = n * sumXY - sumX * sumY;
+    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+    
+    if (denominator === 0) return 0;
+    return numerator / denominator;
+}
+
 // ===== INITIALIZE ON PAGE LOAD =====
 document.addEventListener('DOMContentLoaded', function() {
     const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
@@ -553,15 +1113,6 @@ document.addEventListener('DOMContentLoaded', function() {
         defaultMoodBtn.classList.add('active');
     }
 });
-
-// ===== KEYBOARD SHORTCUTS =====
-if (document.getElementById("password")) {
-    document.getElementById("password").addEventListener("keypress", function(e) {
-        if (e.key === "Enter") {
-            login();
-        }
-    });
-}
 
 // Close modal when clicking outside
 document.addEventListener('click', function(e) {
