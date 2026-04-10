@@ -6,7 +6,6 @@
     <title>Personal Productive Self-Assessment Tool</title>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="background-pattern"></div>
@@ -30,6 +29,13 @@
                     <div class="form-group">
                         <label class="form-label">Password (any for demo)</label>
                         <input type="password" id="password" placeholder="••••••" class="form-input">
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="button" onclick="requestNotificationPermission()" class="btn btn-secondary" style="width: 100%;">
+                            🔔 Enable Daily Reminders
+                        </button>
+                        <p class="notification-hint">Get notified to log your daily productivity</p>
                     </div>
                     
                     <button onclick="login()" class="btn btn-primary">Enter Workspace</button>
@@ -56,10 +62,38 @@
                 </div>
             </header>
 
+            <!-- Reminder Settings Card -->
+            <div id="reminder-settings" class="reminder-settings-card" style="display: none;">
+                <div class="reminder-header">
+                    <span>🔔 Notification Settings</span>
+                    <button onclick="toggleReminderSettings()" class="btn-icon-small">⚙️</button>
+                </div>
+                <div class="reminder-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="daily-reminder-toggle" onchange="toggleDailyReminder()">
+                        <span>Daily reminder to log entry</span>
+                    </label>
+                    <div class="reminder-time-select" id="reminder-time-group" style="display: none;">
+                        <label>Reminder time:</label>
+                        <input type="time" id="reminder-time" value="20:00" onchange="saveReminderTime()">
+                    </div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="weekly-report-toggle" onchange="toggleWeeklyReport()">
+                        <span>Weekly summary report (Sundays)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="nudge-toggle" onchange="toggleNudge()">
+                        <span>Gentle nudge if I miss logging (3 days)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Work Time Suggestion Card -->
+            <div id="work-time-suggestion" class="work-time-suggestion-card" style="display: none;"></div>
+
             <form id="planning-form" class="planning-form">
                 <h3 class="section-title">Daily Planning</h3>
                 
-                <!-- Mood Section -->
                 <div class="form-section">
                     <label class="form-label">How are you feeling today?</label>
                     <div class="mood-container">
@@ -79,7 +113,6 @@
                     <input type="hidden" id="selected-mood" value="😊">
                 </div>
 
-                <!-- Tasks Section -->
                 <div class="form-section">
                     <label class="form-label">What are your specific tasks today?</label>
                     <div class="task-input-group">
@@ -90,7 +123,6 @@
                     <input type="hidden" id="tasks">
                 </div>
 
-                <!-- Time Blocks -->
                 <div class="form-section">
                     <label class="form-label">How many hours will you work today?</label>
                     <input type="number" id="total-hours" class="form-input time-input" min="1" max="12" value="6" required>
@@ -109,7 +141,6 @@
                     </div>
                 </div>
 
-                <!-- Productivity Rating -->
                 <div class="form-section">
                     <label class="form-label">Rate your expected productivity</label>
                     <div class="rating-wrapper">
@@ -118,7 +149,6 @@
                     </div>
                 </div>
 
-                <!-- Comments -->
                 <div class="form-section">
                     <label class="form-label">Comments & Reflections</label>
                     <textarea id="comments" class="form-input form-textarea" rows="4" placeholder="What went well? Any distractions?"></textarea>
@@ -127,7 +157,6 @@
                 <button type="button" onclick="saveEntry()" class="btn btn-primary btn-large">Save Today's Entry</button>
             </form>
 
-            <!-- Summary Card -->
             <div id="summary" class="summary-card hidden">
                 <h3 class="section-title">Today's Plan Summary</h3>
                 <div class="summary-grid">
@@ -158,12 +187,9 @@
                 </div>
             </div>
 
-            <!-- Lessons Section -->
             <div class="reflection-card">
                 <h3 class="section-title">What I Learned Today</h3>
-                <ul id="lessons-list" class="lessons-list">
-                    <!-- Populated by JS -->
-                </ul>
+                <ul id="lessons-list" class="lessons-list"></ul>
             </div>
         </div>
 
@@ -183,7 +209,6 @@
             </header>
 
             <div class="history-container">
-                <!-- Statistics Summary -->
                 <div class="stats-summary">
                     <h3 class="section-title">Your Statistics</h3>
                     <div class="stats-grid">
@@ -218,19 +243,15 @@
                     </div>
                 </div>
 
-                <!-- Charts Section -->
                 <div class="charts-section">
                     <h3 class="section-title">📊 Analytics Dashboard</h3>
-                    
-                    <!-- Chart Tabs -->
                     <div class="chart-tabs">
-                        <button class="chart-tab active" onclick="switchChartTab('productivity')">📈 Productivity Trend</button>
-                        <button class="chart-tab" onclick="switchChartTab('mood')">😊 Mood Distribution</button>
-                        <button class="chart-tab" onclick="switchChartTab('heatmap')">🔥 Productivity Heatmap</button>
-                        <button class="chart-tab" onclick="switchChartTab('correlation')">📉 Hours vs Productivity</button>
+                        <button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button>
+                        <button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button>
+                        <button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button>
+                        <button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button>
                     </div>
                     
-                    <!-- Chart Containers -->
                     <div id="productivity-chart-container" class="chart-container active">
                         <canvas id="productivityTrendChart"></canvas>
                         <div class="chart-insight" id="trend-insight"></div>
@@ -252,7 +273,6 @@
                     </div>
                 </div>
 
-                <!-- Filter Options -->
                 <div class="filter-section">
                     <h3 class="section-title">Filter Results</h3>
                     <div class="filter-controls">
@@ -272,27 +292,22 @@
                     </div>
                 </div>
 
-                <!-- History List -->
                 <div class="history-list-container">
                     <h3 class="section-title">Entries</h3>
-                    <div id="history-list" class="history-list">
-                        <!-- Populated by JS -->
-                    </div>
+                    <div id="history-list" class="history-list"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal for Detailed View -->
     <div id="detail-modal" class="modal hidden">
         <div class="modal-content">
             <button onclick="closeDetailModal()" class="modal-close">×</button>
-            <div id="detail-content" class="detail-content">
-                <!-- Populated by JS -->
-            </div>
+            <div id="detail-content" class="detail-content"></div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
