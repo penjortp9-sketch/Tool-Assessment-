@@ -1,6 +1,7 @@
 // ============================================
 // COMPLETE JAVASCRIPT - WITH BLOCK RATINGS SYSTEM
 // INCLUDING DARK/LIGHT MODE TOGGLE & BLOCK ASSIGNMENT WITH RATINGS
+// UPDATED: Ratings only available AFTER block completion
 // ============================================
 
 // State Management
@@ -17,6 +18,7 @@ let reminderCheckInterval = null;
 // Block Assignment & Rating Storage
 let blockAssignmentMap = {};
 let blockRatingMap = {};
+let blockCompletionStatus = {}; // NEW: Track which blocks are completed
 let blockAssignmentFinished = false;
 
 // ============================================
@@ -136,7 +138,31 @@ function getBlockNameByIndex(idx) {
     return `Block ${idx+1}`;
 }
 
-// Render Block Assignment UI with Rating Buttons
+// NEW: Mark block as completed
+function markBlockCompleted(blockIdx) {
+    const assignedTask = blockAssignmentMap[blockIdx] || '';
+    
+    if (!assignedTask) {
+        showAlert(`⚠️ Please assign a task to this block first!`, "error");
+        return;
+    }
+    
+    // Toggle completion status
+    blockCompletionStatus[blockIdx] = !blockCompletionStatus[blockIdx];
+    
+    if (blockCompletionStatus[blockIdx]) {
+        showAlert(`✅ Block ${blockIdx + 1} marked as completed! You can now rate it.`, "success");
+    } else {
+        // If uncompleting, also remove the rating
+        delete blockRatingMap[blockIdx];
+        showAlert(`⏳ Block ${blockIdx + 1} marked as incomplete. Rating cleared.`, "warning");
+    }
+    
+    renderBlockAssignmentUI();
+    updateRatingSummary();
+}
+
+// Render Block Assignment UI with Rating Buttons (UPDATED)
 function renderBlockAssignmentUI() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const container = document.getElementById('blockAssignmentContainer');
@@ -153,14 +179,18 @@ function renderBlockAssignmentUI() {
         const currentBlockName = getBlockNameByIndex(i);
         const selectedVal = blockAssignmentMap[i] || '';
         const currentRating = blockRatingMap[i] || '';
+        const isCompleted = blockCompletionStatus[i] || false;
         
-        html += `<div class="block-assign-row" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--card-bg); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-color);">
+        html += `<div class="block-assign-row" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--card-bg); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-color); ${isCompleted ? 'border-left: 4px solid #10B981;' : ''}">
                     <strong style="min-width: 110px;">📌 ${escapeHtml(currentBlockName)}</strong>
                     <select data-block-index="${i}" class="block-task-select" style="flex:1; padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-dark);">
                         <option value="">— Select a task —</option>
                         ${taskList.map(task => `<option value="${escapeHtml(task)}" ${selectedVal === task ? 'selected' : ''}>${escapeHtml(task)}</option>`).join('')}
                     </select>
-                    <button type="button" class="btn-rate-block" data-block="${i}" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: all 0.3s ease;">
+                    <button type="button" class="btn-complete-block" data-block="${i}" style="padding: 8px 16px; background: ${isCompleted ? '#10B981' : '#D4A574'}; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: all 0.3s ease; font-weight: 600;">
+                        ${isCompleted ? '✅ Completed' : '⏳ Mark Done'}
+                    </button>
+                    <button type="button" class="btn-rate-block" data-block="${i}" style="padding: 8px 16px; background: ${isCompleted ? 'var(--primary)' : '#CCCCCC'}; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: all 0.3s ease; ${!isCompleted ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!isCompleted ? 'disabled' : ''}>
                         ${currentRating ? `⭐ ${currentRating}/10` : 'Rate →'}
                     </button>
                 </div>`;
@@ -177,7 +207,19 @@ function renderBlockAssignmentUI() {
             else delete blockAssignmentMap[blockIdx];
             blockAssignmentFinished = false;
             document.getElementById('assignmentStatusMsg').innerHTML = '';
+            // Clear completion and rating if task changed
+            blockCompletionStatus[blockIdx] = false;
+            delete blockRatingMap[blockIdx];
             updateRatingSummary();
+            renderBlockAssignmentUI();
+        });
+    });
+    
+    // Add event listeners for completion buttons
+    document.querySelectorAll('.btn-complete-block').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const blockIdx = parseInt(btn.getAttribute('data-block'));
+            markBlockCompleted(blockIdx);
         });
     });
     
@@ -185,14 +227,18 @@ function renderBlockAssignmentUI() {
     document.querySelectorAll('.btn-rate-block').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const blockIdx = parseInt(btn.getAttribute('data-block'));
-            showRatingModal(blockIdx);
+            if (blockCompletionStatus[blockIdx]) {
+                showRatingModal(blockIdx);
+            } else {
+                showAlert(`⚠️ Please mark Block ${blockIdx + 1} as completed first!`, "error");
+            }
         });
     });
     
     updateRatingSummary();
 }
 
-// Show rating modal for individual block
+// Show rating modal for individual block (UPDATED)
 function showRatingModal(blockIdx) {
     const blockName = getBlockNameByIndex(blockIdx);
     const currentRating = blockRatingMap[blockIdx] || '';
@@ -200,6 +246,11 @@ function showRatingModal(blockIdx) {
     
     if (!assignedTask) {
         showAlert(`⚠️ Please select a task for ${blockName} first!`, "error");
+        return;
+    }
+    
+    if (!blockCompletionStatus[blockIdx]) {
+        showAlert(`⚠️ Please mark ${blockName} as completed before rating!`, "error");
         return;
     }
     
@@ -286,11 +337,13 @@ function showAllRatingsModal() {
     for (let i = 0; i < Object.keys(blockAssignmentMap).length; i++) {
         if (blockAssignmentMap[i]) {
             const task = blockAssignmentMap[i];
+            const isCompleted = blockCompletionStatus[i] || false;
             const rating = blockRatingMap[i] || 'Not rated';
             const ratingClass = rating >= 8 ? 'rating-high' : (rating >= 5 ? 'rating-medium' : 'rating-low');
             ratingsHtml += `
-                <div style="padding: 12px; margin-bottom: 10px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid var(--primary);">
+                <div style="padding: 12px; margin-bottom: 10px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid ${isCompleted ? '#10B981' : 'var(--primary)'};">
                     <strong>Block ${i+1}:</strong> ${escapeHtml(task)}<br>
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">${isCompleted ? '✅ Completed' : '⏳ Not completed'}</span><br>
                     <span class="rating-badge ${ratingClass}" style="margin-top: 5px; display: inline-block;">⭐ ${rating}/10</span>
                 </div>
             `;
@@ -321,6 +374,7 @@ function resetAllBlockAssignments() {
     if (confirm('Are you sure you want to reset all block assignments and ratings?')) {
         blockAssignmentMap = {};
         blockRatingMap = {};
+        blockCompletionStatus = {};
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
         renderBlockAssignmentUI();
@@ -341,6 +395,7 @@ function autoGenerateBlocksManual() {
     setTimeout(() => blockTasksInput.style.borderColor = '', 2000);
     blockAssignmentMap = {};
     blockRatingMap = {};
+    blockCompletionStatus = {};
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     renderBlockAssignmentUI();
@@ -350,11 +405,14 @@ function autoGenerateBlocksManual() {
 function finalizeBlockAssignments() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const missingBlocks = [];
+    const uncompletedBlocks = [];
     const unratedBlocks = [];
     
     for (let i = 0; i < blocksCount; i++) {
         if (!blockAssignmentMap[i]) {
             missingBlocks.push(i+1);
+        } else if (!blockCompletionStatus[i]) {
+            uncompletedBlocks.push(i+1);
         } else if (!blockRatingMap[i]) {
             unratedBlocks.push(i+1);
         }
@@ -362,6 +420,11 @@ function finalizeBlockAssignments() {
     
     if (missingBlocks.length > 0) {
         showAlert(`⚠️ Please assign a task to Block(s) ${missingBlocks.join(', ')} before finishing.`, "error");
+        return false;
+    }
+    
+    if (uncompletedBlocks.length > 0) {
+        showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed before finishing.`, "error");
         return false;
     }
     
@@ -399,393 +462,348 @@ function logout() {
     document.getElementById("main-screen").classList.add("hidden");
     document.getElementById("history-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
-    document.getElementById("summary").classList.add("hidden");
+    document.getElementById("username").value = currentUser;
     taskList = [];
     blockAssignmentMap = {};
     blockRatingMap = {};
+    blockCompletionStatus = {};
     blockAssignmentFinished = false;
 }
 
+// Setup event listeners for block count and hours
 function setupEventListeners() {
-    const totalHoursInput = document.getElementById("total-hours");
-    const blocksInput = document.getElementById("blocks");
-    const blockTasksInput = document.getElementById("block-tasks");
-    const ratingSlider = document.getElementById("productivity");
-    const ratingValue = document.getElementById("rating-value");
-    const taskInput = document.getElementById("task-input");
-    
-    function autoGenerateBlocks() {
-        const total = parseFloat(totalHoursInput.value) || 0;
-        const blocks = parseInt(blocksInput.value) || 1;
-        const hoursPerBlock = (total / blocks).toFixed(1);
-        let blockLabels = [];
-        for (let i = 1; i <= blocks; i++) blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
-        blockTasksInput.value = blockLabels.join(", ");
-        renderBlockAssignmentUI();
-        blockAssignmentFinished = false;
-        document.getElementById('assignmentStatusMsg').innerHTML = '';
-    }
-    
-    totalHoursInput.addEventListener("input", autoGenerateBlocks);
-    blocksInput.addEventListener("input", autoGenerateBlocks);
-    ratingSlider.addEventListener("input", () => ratingValue.textContent = ratingSlider.value);
-    if (taskInput) taskInput.addEventListener("keypress", e => { if (e.key === "Enter") { e.preventDefault(); addTask(); } });
-    const finalizeBtn = document.getElementById("finalizeBlockTasksBtn");
-    if (finalizeBtn) finalizeBtn.onclick = () => finalizeBlockAssignments();
+    const blocksInput = document.getElementById('blocks');
+    const hoursInput = document.getElementById('total-hours');
+    if (blocksInput) blocksInput.addEventListener('change', renderBlockAssignmentUI);
+    if (hoursInput) hoursInput.addEventListener('change', autoGenerateBlocksManual);
+}
+
+// Alert system
+function showAlert(msg, type = "info") {
+    const alertDiv = document.createElement('div');
+    alertDiv.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px; padding: 16px 24px; 
+        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#3B82F6'};
+        color: white; border-radius: 12px; z-index: 9999; animation: slideInUp 0.3s ease-out;
+        font-weight: 600; max-width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    `;
+    alertDiv.textContent = msg;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
 }
 
 // Save Entry
 function saveEntry() {
-    const tasks = document.getElementById("tasks").value.trim();
-    const totalHours = document.getElementById("total-hours").value;
-    const blockTasks = document.getElementById("block-tasks").value.trim();
-    const blocks = document.getElementById("blocks").value;
-    const productivity = document.getElementById("productivity").value;
-    const comments = document.getElementById("comments").value.trim();
-    const mood = document.getElementById("selected-mood").value;
+    const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     
-    if (!tasks) { showAlert("❌ Please add at least one task today.", "error"); return; }
-    if (!blockTasks) { showAlert("❌ Please divide your work into blocks.", "error"); return; }
-    if (!blockAssignmentFinished) {
-        showAlert("📋 Before rating productivity, please click 'Mark Block Tasks as Finished' to confirm which task you'll work on in each block.", "error");
+    // Validate all blocks are assigned and completed
+    const missingBlocks = [];
+    const uncompletedBlocks = [];
+    for (let i = 0; i < blocksCount; i++) {
+        if (!blockAssignmentMap[i]) missingBlocks.push(i+1);
+        if (!blockCompletionStatus[i]) uncompletedBlocks.push(i+1);
+    }
+    
+    if (missingBlocks.length > 0) {
+        showAlert(`⚠️ Please assign tasks to Block(s) ${missingBlocks.join(', ')}.`, "error");
         return;
     }
     
-    const blocksCount = parseInt(blocks);
-    let assignmentText = "";
-    let ratingsText = "";
-    let totalRatingSum = 0;
-    let ratedBlocks = 0;
-    
-    for (let i = 0; i < blocksCount; i++) {
-        const blockLabel = getBlockNameByIndex(i);
-        const assignedTask = blockAssignmentMap[i] || "Not assigned";
-        const rating = blockRatingMap[i] || "Not rated";
-        assignmentText += `${blockLabel} → ${assignedTask}; `;
-        ratingsText += `${blockLabel} (${assignedTask}): ${rating}/10; `;
-        if (rating !== "Not rated") {
-            totalRatingSum += rating;
-            ratedBlocks++;
-        }
+    if (uncompletedBlocks.length > 0) {
+        showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error");
+        return;
     }
     
-    const averageBlockRating = ratedBlocks > 0 ? (totalRatingSum / ratedBlocks).toFixed(1) : "N/A";
-    const hoursPerBlock = (parseFloat(totalHours) / parseInt(blocks)).toFixed(1);
-    
-    displaySummary({ tasks, blockTasks, totalHours, blocks, hoursPerBlock, productivity, comments, mood, assignmentText, ratingsText, averageBlockRating });
-    generateLessons(mood, tasks, productivity, comments, assignmentText, ratingsText, averageBlockRating);
-    
-    const entryData = {
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString(),
-        tasks, mood, blockTasks, totalHours, blocks, hoursPerBlock, productivity, comments,
-        blockAssignment: assignmentText,
-        blockRatings: ratingsText,
-        averageBlockRating: averageBlockRating,
-        blockRatingsData: blockRatingMap,
+    const entry = {
         timestamp: new Date().toISOString(),
-        id: Date.now()
+        date: new Date().toLocaleDateString('en-GB'),
+        mood: document.getElementById('selected-mood').value,
+        tasks: taskList.join(', '),
+        totalHours: parseFloat(document.getElementById('total-hours').value),
+        blocks: parseInt(document.getElementById('blocks').value),
+        blockRatingsData: { ...blockRatingMap },
+        blockAssignmentData: { ...blockAssignmentMap },
+        blockCompletionData: { ...blockCompletionStatus },
+        productivity: parseInt(document.getElementById('productivity').value),
+        comments: document.getElementById('comments').value
     };
     
-    saveToHistory(entryData);
-    localStorage.setItem("lastLogDate", new Date().toLocaleDateString());
-    showAlert("✅ Today's entry saved successfully!", "success");
-    setTimeout(() => { displayWorkTimeSuggestion(); }, 500);
-    setTimeout(() => document.getElementById("summary").scrollIntoView({ behavior: "smooth" }), 300);
+    let history = getHistory();
+    history.push(entry);
+    localStorage.setItem('productivity_history', JSON.stringify(history));
     
-    // Reset for next day
-    blockAssignmentFinished = false;
+    showAlert('✅ Entry saved successfully!', 'success');
+    resetForm();
+}
+
+function resetForm() {
+    document.getElementById('selected-mood').value = '😊';
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-mood="😊"]').classList.add('active');
+    taskList = [];
+    updateTaskListUI();
+    document.getElementById('tasks').value = '';
+    document.getElementById('total-hours').value = '6';
+    document.getElementById('blocks').value = '3';
+    document.getElementById('productivity').value = '7';
+    document.getElementById('rating-value').textContent = '7';
+    document.getElementById('comments').value = '';
     blockAssignmentMap = {};
     blockRatingMap = {};
+    blockCompletionStatus = {};
+    blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
-    renderBlockAssignmentUI();
+    setTimeout(() => autoGenerateBlocksManual(), 100);
 }
 
-function displaySummary(data) {
-    document.getElementById("sum-tasks").textContent = data.tasks;
-    document.getElementById("sum-block-tasks").textContent = data.blockTasks;
-    document.getElementById("sum-hours").textContent = `${data.totalHours} hours`;
-    document.getElementById("sum-blocks").textContent = data.blocks;
-    document.getElementById("sum-per-block").textContent = data.hoursPerBlock;
-    document.getElementById("sum-rating").textContent = `${data.productivity}/10`;
-    document.getElementById("sum-comments").textContent = data.comments || "No notes added.";
-    document.getElementById("sum-block-assignment").innerHTML = `<strong>Tasks & Ratings:</strong><br>${data.ratingsText || data.assignmentText || "No assignment recorded"}<br><br><strong>Average Block Rating:</strong> ${data.averageBlockRating || "N/A"}/10`;
-    document.getElementById("summary").classList.remove("hidden");
+// Get history
+function getHistory() {
+    const stored = localStorage.getItem('productivity_history');
+    return stored ? JSON.parse(stored) : [];
 }
 
-function generateLessons(mood, tasks, productivity, comments, assignmentText, ratingsText, averageBlockRating) {
-    let feedback = "", icon = "📌";
-    if (productivity >= 9) { feedback = "Excellent! You were highly focused and productive today."; icon = "🚀"; }
-    else if (productivity >= 6) { feedback = "Good job! Small improvements can make it even better next time."; icon = "⭐"; }
-    else if (productivity >= 4) { feedback = "Fair effort. Try reducing distractions and planning better tomorrow."; icon = "🎯"; }
-    else { feedback = "Room for improvement. Focus on planning and minimizing interruptions."; icon = "💪"; }
-    
-    let moodEmoji = mood, moodText = "focused";
-    if (mood === "😊") moodText = "happy and positive";
-    if (mood === "😴") moodText = "tired";
-    
-    document.getElementById("lessons-list").innerHTML = `
-        <li><strong>🌅 Morning Mood:</strong> You started the day feeling ${moodEmoji} (${moodText})</li>
-        <li><strong>📋 Plan Execution:</strong> You worked on: ${escapeHtml(tasks)}</li>
-        <li><strong>🎯 Block Plan & Ratings:</strong> ${escapeHtml(ratingsText || assignmentText)}</li>
-        <li><strong>⭐ Average Block Difficulty:</strong> ${averageBlockRating || "N/A"}/10</li>
-        <li><strong>📊 Progress:</strong> ${feedback}</li>
-        <li><strong>${icon} Key Takeaway:</strong> ${escapeHtml(comments) || "Every day is a chance to improve your productivity."}</li>
-    `;
-}
-
-// History Management
-function saveToHistory(entry) {
-    let history = JSON.parse(localStorage.getItem("productivityHistory") || "[]");
-    history.push(entry);
-    localStorage.setItem("productivityHistory", JSON.stringify(history));
-}
-
-function getHistory() { return JSON.parse(localStorage.getItem("productivityHistory") || "[]"); }
-
+// History Screen Functions
 function showHistoryScreen() {
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("history-screen").classList.remove("hidden");
+    document.getElementById('main-screen').classList.add('hidden');
+    document.getElementById('history-screen').classList.remove('hidden');
     loadHistoryData();
-    setTimeout(() => {
-        loadProductivityTrendChart();
-        loadMoodDistributionChart();
-        loadHeatmapCalendar();
-        loadCorrelationChart();
-        loadBlockRatingsChart();
-    }, 100);
 }
 
 function backToDashboard() {
-    document.getElementById("history-screen").classList.add("hidden");
-    document.getElementById("main-screen").classList.remove("hidden");
-    resetFilters();
+    document.getElementById('history-screen').classList.add('hidden');
+    document.getElementById('main-screen').classList.remove('hidden');
 }
 
 function loadHistoryData() {
     const history = getHistory();
-    filteredHistoryData = [...history].reverse();
-    calculateStatistics(history);
-    displayHistoryList(filteredHistoryData);
+    filteredHistoryData = history;
+    displayStats();
+    displayHistory();
+    loadProductivityTrendChart();
+    loadMoodDistributionChart();
+    loadHeatmapChart();
+    loadCorrelationChart();
+    loadBlockRatingsChart();
 }
 
-function calculateStatistics(history) {
-    const statsGrid = document.getElementById("statsGrid");
-    if (!statsGrid) return;
+function displayStats() {
+    const history = filteredHistoryData;
     if (history.length === 0) {
-        statsGrid.innerHTML = `<div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><span class="stat-label">Total Entries</span><span class="stat-number">0</span></div></div><div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Productivity</span><span class="stat-number">0</span><span class="stat-unit">/10</span></div></div><div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><span class="stat-label">Avg Work Hours</span><span class="stat-number">0</span><span class="stat-unit">h</span></div></div><div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-content"><span class="stat-label">Most Common Mood</span><span class="stat-number">-</span></div></div>`;
+        document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No data yet. Start logging your productivity!</p></div>';
         return;
     }
-    const avgProductivity = (history.reduce((sum, h) => sum + parseInt(h.productivity), 0) / history.length).toFixed(1);
-    const avgHours = (history.reduce((sum, h) => sum + parseFloat(h.totalHours), 0) / history.length).toFixed(1);
-    const moodCounts = {};
-    history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
-    const mostCommonMood = Object.keys(moodCounts).reduce((a, b) => moodCounts[a] > moodCounts[b] ? a : b, "🔥");
     
-    // Calculate average block rating if available
-    const validBlockRatings = history.filter(h => h.averageBlockRating && h.averageBlockRating !== "N/A").map(h => parseFloat(h.averageBlockRating));
-    const avgBlockRating = validBlockRatings.length > 0 ? (validBlockRatings.reduce((a,b) => a+b, 0) / validBlockRatings.length).toFixed(1) : "N/A";
+    const totalEntries = history.length;
+    const avgProductivity = (history.reduce((sum, h) => sum + (parseInt(h.productivity) || 0), 0) / totalEntries).toFixed(1);
+    const totalHours = history.reduce((sum, h) => sum + (parseFloat(h.totalHours) || 0), 0).toFixed(1);
+    const mostFrequentMood = getMostFrequent(history.map(h => h.mood));
     
-    statsGrid.innerHTML = `<div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><span class="stat-label">Total Entries</span><span class="stat-number">${history.length}</span></div></div>
-                          <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Productivity</span><span class="stat-number">${avgProductivity}</span><span class="stat-unit">/10</span></div></div>
-                          <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><span class="stat-label">Avg Work Hours</span><span class="stat-number">${avgHours}</span><span class="stat-unit">h</span></div></div>
-                          <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Block Rating</span><span class="stat-number">${avgBlockRating}</span><span class="stat-unit">/10</span></div></div>
-                          <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-content"><span class="stat-label">Most Common Mood</span><span class="stat-number">${mostCommonMood}</span></div></div>`;
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card"><div class="stat-label">📊 Total Entries</div><div class="stat-value">${totalEntries}</div></div>
+        <div class="stat-card"><div class="stat-label">⭐ Avg Productivity</div><div class="stat-value">${avgProductivity}/10</div></div>
+        <div class="stat-card"><div class="stat-label">⏱️ Total Hours</div><div class="stat-value">${totalHours}h</div></div>
+        <div class="stat-card"><div class="stat-label">😊 Mood</div><div class="stat-value">${mostFrequentMood}</div></div>
+    `;
 }
 
-function displayHistoryList(historyData) {
-    const historyList = document.getElementById("history-list");
-    if (historyData.length === 0) {
-        historyList.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>`;
+function getMostFrequent(arr) {
+    const counts = {};
+    arr.forEach(item => counts[item] = (counts[item] || 0) + 1);
+    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+}
+
+function displayHistory() {
+    const history = filteredHistoryData;
+    const list = document.getElementById('history-list');
+    
+    if (history.length === 0) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>';
         return;
     }
-    historyList.innerHTML = historyData.map(entry => `<div class="history-item" onclick="showDetailModal('${entry.id}')">
-        <div class="history-item-header">
-            <div class="history-date"><span class="date-day">${new Date(entry.timestamp).toLocaleDateString('en-GB', {weekday: 'short'})}</span>
-            <span class="date-full">${entry.date}</span><span class="date-time">${entry.time}</span></div>
-            <div class="history-mood">${entry.mood}</div>
-        </div>
-        <div class="history-item-content">
-            <div class="history-quick-stats">
-                <div class="quick-stat"><span class="stat-icon">⏱️</span><span class="stat-text">${entry.totalHours}h</span></div>
-                <div class="quick-stat"><span class="stat-icon">📊</span><span class="stat-text">${entry.productivity}/10</span></div>
-                <div class="quick-stat"><span class="stat-icon">⭐</span><span class="stat-text">${entry.averageBlockRating || "N/A"}/10</span></div>
+    
+    list.innerHTML = history.reverse().map((entry, idx) => `
+        <div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})">
+            <div class="history-item-header">
+                <div class="history-date">
+                    <span class="date-full">${entry.date}</span>
+                    <span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div class="history-mood">${entry.mood}</div>
             </div>
-            <p class="history-tasks"><strong>Tasks:</strong> ${escapeHtml(entry.tasks.substring(0, 60))}${entry.tasks.length > 60 ? '...' : ''}</p>
+            <div class="history-quick-stats">
+                <div class="quick-stat"><span class="stat-text productivity-${entry.productivity >= 8 ? 'high' : entry.productivity >= 5 ? 'medium' : 'low'}">⭐ ${entry.productivity}/10</span></div>
+                <div class="quick-stat">⏱️ ${entry.totalHours}h</div>
+                <div class="quick-stat">📦 ${entry.blocks} blocks</div>
+            </div>
+            <p class="history-tasks">${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p>
+            <div class="history-item-action">View Details →</div>
         </div>
-        <div class="history-item-action"><span class="view-details">View Details →</span></div>
-    </div>`).join('');
+    `).join('');
+}
+
+function showEntryDetail(idx) {
+    const history = getHistory();
+    const entry = history[idx];
+    const detailContent = document.getElementById('detail-content');
+    
+    let blockDetails = '';
+    if (entry.blockAssignmentData) {
+        for (let i = 0; i < Object.keys(entry.blockAssignmentData).length; i++) {
+            const task = entry.blockAssignmentData[i];
+            const completed = entry.blockCompletionData[i] ? '✅' : '⏳';
+            const rating = entry.blockRatingsData[i] ? `⭐ ${entry.blockRatingsData[i]}/10` : 'Not rated';
+            blockDetails += `<div style="padding: 10px; background: var(--bg-light); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid var(--primary);">
+                <strong>Block ${i+1}:</strong> ${escapeHtml(task)}<br>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">${completed} ${rating}</span>
+            </div>`;
+        }
+    }
+    
+    detailContent.innerHTML = `
+        <div class="detail-header">
+            <h2 class="detail-title">${entry.date}</h2>
+            <p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-item"><span class="detail-label">Mood</span><div class="detail-value">${entry.mood}</div></div>
+            <div class="detail-item"><span class="detail-label">Productivity</span><div class="detail-value">${entry.productivity}/10</div></div>
+            <div class="detail-item"><span class="detail-label">Hours</span><div class="detail-value">${entry.totalHours}h</div></div>
+            <div class="detail-item"><span class="detail-label">Blocks</span><div class="detail-value">${entry.blocks}</div></div>
+        </div>
+        <div class="detail-section">
+            <h3>📋 Tasks</h3>
+            <p>${escapeHtml(entry.tasks)}</p>
+        </div>
+        ${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details</h3>${blockDetails}</div>` : ''}
+        ${entry.comments ? `<div class="detail-section"><h3>💭 Notes</h3><p>${escapeHtml(entry.comments)}</p></div>` : ''}
+    `;
+    
+    document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal').classList.add('hidden');
 }
 
 function filterHistory() {
-    const moodFilter = document.getElementById("mood-filter").value;
-    const productivityFilter = document.getElementById("productivity-filter").value;
-    let history = getHistory().reverse();
-    if (moodFilter) history = history.filter(h => h.mood === moodFilter);
-    if (productivityFilter === 'high') history = history.filter(h => parseInt(h.productivity) >= 8);
-    else if (productivityFilter === 'medium') history = history.filter(h => parseInt(h.productivity) >= 5 && parseInt(h.productivity) < 8);
-    else if (productivityFilter === 'low') history = history.filter(h => parseInt(h.productivity) < 5);
-    filteredHistoryData = history;
-    displayHistoryList(filteredHistoryData);
-}
-
-function resetFilters() { document.getElementById("mood-filter").value = ""; document.getElementById("productivity-filter").value = ""; loadHistoryData(); }
-
-function showDetailModal(entryId) {
+    const moodFilter = document.getElementById('mood-filter').value;
+    const productivityFilter = document.getElementById('productivity-filter').value;
     const history = getHistory();
-    const entry = history.find(h => h.id == entryId);
-    if (!entry) return;
-    document.getElementById("detail-content").innerHTML = `<div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${entry.time}</p></div>
-    <div class="detail-grid"><div class="detail-item"><span class="detail-label">Mood</span><span class="detail-value">${entry.mood}</span></div>
-    <div class="detail-item"><span class="detail-label">Productivity</span><span class="detail-value">${entry.productivity}/10</span></div>
-    <div class="detail-item"><span class="detail-label">Work Hours</span><span class="detail-value">${entry.totalHours}h</span></div>
-    <div class="detail-item"><span class="detail-label">Blocks</span><span class="detail-value">${entry.blocks}</span></div>
-    <div class="detail-item"><span class="detail-label">Avg Block Rating</span><span class="detail-value">${entry.averageBlockRating || "N/A"}/10</span></div></div>
-    <div class="detail-section"><h3>📋 Tasks</h3><p>${escapeHtml(entry.tasks)}</p></div>
-    <div class="detail-section"><h3>⏱️ Block Assignment & Ratings</h3><p>${escapeHtml(entry.blockRatings || entry.blockAssignment || "No details")}</p></div>
-    <div class="detail-section"><h3>📝 Notes</h3><p>${escapeHtml(entry.comments) || 'No notes added.'}</p></div>
-    <div class="detail-actions"><button onclick="deleteHistoryEntry(${entry.id})" class="btn btn-secondary btn-danger">🗑️ Delete Entry</button></div>`;
-    document.getElementById("detail-modal").classList.remove("hidden");
+    
+    filteredHistoryData = history.filter(entry => {
+        const moodMatch = !moodFilter || entry.mood === moodFilter;
+        let productivityMatch = !productivityFilter;
+        if (productivityFilter === 'high') productivityMatch = parseInt(entry.productivity) >= 8;
+        else if (productivityFilter === 'medium') productivityMatch = parseInt(entry.productivity) >= 5 && parseInt(entry.productivity) < 8;
+        else if (productivityFilter === 'low') productivityMatch = parseInt(entry.productivity) < 5;
+        return moodMatch && productivityMatch;
+    });
+    
+    displayHistory();
 }
 
-function closeDetailModal() { document.getElementById("detail-modal").classList.add("hidden"); }
-
-function deleteHistoryEntry(entryId) {
-    if (confirm("Are you sure you want to delete this entry?")) {
-        let history = getHistory();
-        history = history.filter(h => h.id != entryId);
-        localStorage.setItem("productivityHistory", JSON.stringify(history));
-        closeDetailModal();
-        loadHistoryData();
-        showAlert("✅ Entry deleted successfully!", "success");
-    }
+function resetFilters() {
+    document.getElementById('mood-filter').value = '';
+    document.getElementById('productivity-filter').value = '';
+    filteredHistoryData = getHistory();
+    displayHistory();
 }
 
 function clearAllHistory() {
-    if(confirm("⚠️ This will delete ALL your entries. Are you sure?")) {
-        if(confirm("Really? This cannot be undone!")) {
-            localStorage.removeItem("productivityHistory");
-            loadHistoryData();
-            showAlert("✅ All entries cleared!", "success");
-        }
+    if (confirm('⚠️ Are you sure? This will delete all productivity entries permanently!')) {
+        localStorage.removeItem('productivity_history');
+        showAlert('🗑️ All history cleared', 'success');
+        loadHistoryData();
     }
 }
 
-function showAlert(message, type = "info") {
-    const alertDiv = document.createElement('div');
-    alertDiv.style.cssText = `position: fixed; top: 20px; right: 20px; background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#3B82F6'}; color: white; padding: 16px 24px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 9999; animation: slideInDown 0.4s ease-out; font-weight: 600;`;
-    alertDiv.textContent = message;
-    document.body.appendChild(alertDiv);
-    setTimeout(() => { alertDiv.style.animation = 'slideInUp 0.4s ease-out reverse'; setTimeout(() => alertDiv.remove(), 400); }, 2500);
-}
-
-// ============================================
-// ANALYTICS DASHBOARD - WITH BLOCK RATINGS CHART
-// ============================================
-
-function switchChartTab(tabName, event) {
-    document.querySelectorAll('.chart-tab').forEach(tab => tab.classList.remove('active'));
-    if (event) event.target.classList.add('active');
-    document.querySelectorAll('.chart-container').forEach(container => container.classList.remove('active'));
-    document.getElementById(`${tabName}-chart-container`).classList.add('active');
-    if (tabName === 'productivity') loadProductivityTrendChart();
-    else if (tabName === 'mood') loadMoodDistributionChart();
-    else if (tabName === 'heatmap') loadHeatmapCalendar();
-    else if (tabName === 'correlation') loadCorrelationChart();
-    else if (tabName === 'blockratings') loadBlockRatingsChart();
+// Chart functions
+function switchChartTab(tab, event) {
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.chart-container').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(`${tab}-chart-container`).classList.add('active');
 }
 
 function loadProductivityTrendChart() {
     const history = getHistory();
     const ctx = document.getElementById('productivityTrendChart').getContext('2d');
     if (history.length === 0) {
-        document.getElementById('trend-insight').innerHTML = '📭 No data available. Start logging your productivity to see trends!';
+        document.getElementById('trend-insight').innerHTML = '📭 No data available. Log entries to see your productivity trend!';
         if (productivityChart) productivityChart.destroy();
         return;
     }
-    const sorted = [...history].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const recentData = sorted.slice(-30);
-    const labels = recentData.map(entry => { const d = new Date(entry.timestamp); return `${d.getMonth()+1}/${d.getDate()}`; });
-    const productivityData = recentData.map(entry => parseInt(entry.productivity));
-    const hoursData = recentData.map(entry => parseFloat(entry.totalHours));
-    const blockRatingData = recentData.map(entry => entry.averageBlockRating && entry.averageBlockRating !== "N/A" ? parseFloat(entry.averageBlockRating) : null);
-    
+    const labels = history.map(h => h.date);
+    const data = history.map(h => parseInt(h.productivity));
+    const avgProductivity = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
     if (productivityChart) productivityChart.destroy();
     productivityChart = new Chart(ctx, {
         type: 'line',
-        data: { labels, datasets: [
-            { label: 'Productivity Rating', data: productivityData, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', yAxisID: 'y' },
-            { label: 'Hours Worked', data: hoursData, borderColor: '#D4A574', backgroundColor: 'rgba(212, 165, 116, 0.1)', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#D4A574', pointBorderColor: '#fff', yAxisID: 'y1' },
-            { label: 'Avg Block Rating', data: blockRatingData, borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#F59E0B', pointBorderColor: '#fff', yAxisID: 'y' }
-        ] },
-        options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', labels: { font: { family: 'Sora', size: 12 } } }, tooltip: { callbacks: { label: function(ctx) { return `${ctx.dataset.label}: ${ctx.raw}${ctx.dataset.label.includes('Productivity') || ctx.dataset.label.includes('Rating') ? '/10' : ' hours'}`; } } } }, scales: { y: { title: { display: true, text: 'Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, y1: { position: 'right', title: { display: true, text: 'Hours Worked' }, grid: { drawOnChartArea: false } }, x: { title: { display: true, text: 'Date' }, ticks: { maxRotation: 45, minRotation: 45 } } } }
+        data: { labels, datasets: [{ label: 'Productivity Rating', data, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', tension: 0.4, pointRadius: 6, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', pointBorderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } }, plugins: { legend: { display: true }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12 } } }
     });
-    const avgProductivity = (productivityData.reduce((a,b) => a+b, 0) / productivityData.length).toFixed(1);
-    const trend = productivityData[productivityData.length-1] - productivityData[0];
-    const trendText = trend > 0 ? '↑ increasing' : trend < 0 ? '↓ decreasing' : '→ stable';
-    document.getElementById('trend-insight').innerHTML = `📊 <strong>Productivity Insight:</strong> Your average productivity is <strong>${avgProductivity}/10</strong> with a ${trendText} trend. ${trend > 0 ? 'Great job improving!' : trend < 0 ? 'Focus on consistency to boost your scores.' : 'Keep maintaining your steady performance!'}`;
+    document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>. ${avgProductivity >= 8 ? 'Excellent consistency! 🎉' : avgProductivity >= 6 ? 'Good progress, keep it up!' : 'Room for improvement. Try adjusting your routine.'}`;
 }
 
 function loadMoodDistributionChart() {
     const history = getHistory();
     const ctx = document.getElementById('moodDistributionChart').getContext('2d');
     if (history.length === 0) {
-        document.getElementById('mood-insight').innerHTML = '📭 No data available. Log your moods to see distribution!';
+        document.getElementById('mood-insight').innerHTML = '📭 No data available. Log entries to see mood distribution!';
         if (moodChart) moodChart.destroy();
         return;
     }
-    const moodMap = { '🔥': { count: 0, label: '🔥 Focused' }, '😊': { count: 0, label: '😊 Happy' }, '😴': { count: 0, label: '😴 Tired' } };
-    history.forEach(entry => { if (moodMap[entry.mood]) moodMap[entry.mood].count++; });
-    const labels = Object.values(moodMap).map(m => m.label);
-    const counts = Object.values(moodMap).map(m => m.count);
-    const moodProductivity = { '🔥': { sum: 0, count: 0 }, '😊': { sum: 0, count: 0 }, '😴': { sum: 0, count: 0 } };
-    history.forEach(entry => { if (moodProductivity[entry.mood]) { moodProductivity[entry.mood].sum += parseInt(entry.productivity); moodProductivity[entry.mood].count++; } });
-    const avgByMood = Object.keys(moodProductivity).map(mood => { const d = moodProductivity[mood]; return d.count > 0 ? (d.sum / d.count).toFixed(1) : 0; });
+    const moodCounts = {};
+    history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
+    const moodLabels = Object.keys(moodCounts);
+    const moodData = Object.values(moodCounts);
     if (moodChart) moodChart.destroy();
     moodChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Number of Days', data: counts, backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8, yAxisID: 'y' }, { label: 'Avg Productivity (when in this mood)', data: avgByMood, type: 'line', borderColor: '#EF4444', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 6, pointBackgroundColor: '#EF4444', pointBorderColor: '#fff', yAxisID: 'y1' }] },
-        options: { responsive: true, maintainAspectRatio: true, scales: { y: { title: { display: true, text: 'Number of Days' }, ticks: { stepSize: 1 } }, y1: { position: 'right', title: { display: true, text: 'Average Productivity (/10)' }, min: 0, max: 10, grid: { drawOnChartArea: false } } } }
+        type: 'doughnut',
+        data: { labels: moodLabels, datasets: [{ data: moodData, backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: true, position: 'bottom' } } }
     });
-    let bestMood = '', bestAvg = 0;
-    Object.keys(moodProductivity).forEach(mood => { const avg = moodProductivity[mood].count > 0 ? moodProductivity[mood].sum / moodProductivity[mood].count : 0; if (avg > bestAvg) { bestAvg = avg; bestMood = mood === '🔥' ? 'Focused' : mood === '😊' ? 'Happy' : 'Tired'; } });
-    document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Analysis:</strong> You feel ${bestMood} most productive (${bestAvg.toFixed(1)}/10). ${bestMood === 'Focused' ? 'Keep maintaining that focused state!' : bestMood === 'Happy' ? 'Happiness boosts your productivity!' : 'Try to get more rest for better results.'}`;
+    const dominantMood = moodLabels[moodData.indexOf(Math.max(...moodData))];
+    document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Insight:</strong> Your dominant mood is <strong>${dominantMood}</strong>. This shows your overall emotional state during work sessions.`;
 }
 
-function loadHeatmapCalendar() {
+function loadHeatmapChart() {
     const history = getHistory();
+    const container = document.getElementById('heatmap-calendar');
     if (history.length === 0) {
-        document.getElementById('heatmap-calendar').innerHTML = '<div class="chart-insight">📭 No data available. Start logging to see your productivity heatmap!</div>';
-        document.getElementById('heatmap-insight').innerHTML = '📭 No data available yet.';
+        document.getElementById('heatmap-insight').innerHTML = '📭 No data available. Log entries to see your heatmap!';
         return;
     }
-    const productivityMap = new Map();
-    history.forEach(entry => { const dateKey = new Date(entry.timestamp).toLocaleDateString(); productivityMap.set(dateKey, parseInt(entry.productivity)); });
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dates = [];
-    for (let i = 89; i >= 0; i--) { const date = new Date(today); date.setDate(today.getDate() - i); dates.push(date); }
-    const heatmapHTML = dates.map(date => {
-        const dateKey = date.toLocaleDateString();
-        const productivity = productivityMap.get(dateKey);
-        const dayNum = date.getDate();
-        const month = date.getMonth() + 1;
-        if (productivity) {
-            let colorClass = '';
-            if (productivity <= 3) colorClass = 'productivity-1';
-            else if (productivity <= 5) colorClass = 'productivity-4';
-            else if (productivity <= 7) colorClass = 'productivity-6';
-            else if (productivity <= 9) colorClass = 'productivity-8';
-            else colorClass = 'productivity-10';
-            return `<div class="heatmap-day ${colorClass}" style="background: var(--${colorClass === 'productivity-1' ? 'danger' : 'primary'}-light); padding: 8px; border-radius: 8px; text-align: center;" title="${date.toLocaleDateString()}: ${productivity}/10"><div><strong>${dayNum}/${month}</strong></div><div style="font-size: 0.7rem;">${productivity}/10</div></div>`;
-        } else {
-            return `<div class="heatmap-day" style="background: var(--bg-light); color: var(--text-muted); padding: 8px; border-radius: 8px; text-align: center;" title="${date.toLocaleDateString()}: No data"><div>${dayNum}/${month}</div><div style="font-size: 0.7rem;">—</div></div>`;
-        }
-    }).join('');
-    const legendHTML = `<div class="heatmap-legend" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px; flex-wrap: wrap;"><div class="legend-item"><div style="width: 20px; height: 20px; background: #FEE2E2; border-radius: 4px;"></div><span>Low (1-3)</span></div><div class="legend-item"><div style="width: 20px; height: 20px; background: #FED7AA; border-radius: 4px;"></div><span>Below Avg (4-5)</span></div><div class="legend-item"><div style="width: 20px; height: 20px; background: #FEF3C7; border-radius: 4px;"></div><span>Average (6-7)</span></div><div class="legend-item"><div style="width: 20px; height: 20px; background: #A7F3D0; border-radius: 4px;"></div><span>Good (8-9)</span></div><div class="legend-item"><div style="width: 20px; height: 20px; background: #34D399; border-radius: 4px;"></div><span>Excellent (10)</span></div></div>`;
-    document.getElementById('heatmap-calendar').innerHTML = `<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">${heatmapHTML}</div>${legendHTML}`;
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    let html = '<div class="heatmap-calendar">';
+    const entryMap = {};
+    history.forEach(entry => {
+        const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB');
+        entryMap[date] = parseInt(entry.productivity);
+    });
+    let currentDate = new Date(thirtyDaysAgo);
+    while (currentDate <= today) {
+        const dateStr = currentDate.toLocaleDateString('en-GB');
+        const productivity = entryMap[dateStr] || 0;
+        const className = `productivity-${productivity}`;
+        html += `<div class="heatmap-day ${className}" title="${dateStr}: ${productivity > 0 ? productivity + '/10' : 'No entry'}">${currentDate.getDate()}</div>`;
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    
+    const currentDate2 = new Date();
     let currentStreak = 0, bestStreak = 0, tempStreak = 0;
-    for (let i = 0; i <= 90; i++) { const date = new Date(today); date.setDate(today.getDate() - i); const dateKey = date.toLocaleDateString(); if (productivityMap.has(dateKey)) { tempStreak++; bestStreak = Math.max(bestStreak, tempStreak); if (i === 0) currentStreak = tempStreak; } else tempStreak = 0; }
+    for (let d = new Date(currentDate2); d >= thirtyDaysAgo; d.setDate(d.getDate() - 1)) {
+        const dateStr = d.toLocaleDateString('en-GB');
+        if (entryMap[dateStr]) { tempStreak++; } else { bestStreak = Math.max(bestStreak, tempStreak); tempStreak = 0; }
+    }
+    bestStreak = Math.max(bestStreak, tempStreak);
+    for (let d = new Date(currentDate2); d >= thirtyDaysAgo; d.setDate(d.getDate() - 1)) {
+        const dateStr = d.toLocaleDateString('en-GB');
+        if (entryMap[dateStr]) { currentStreak++; } else { break; }
+    }
     document.getElementById('heatmap-insight').innerHTML = `🔥 <strong>Consistency Tracker:</strong> Current streak: <strong>${currentStreak}</strong> days | Best streak: <strong>${bestStreak}</strong> days. ${currentStreak >= 7 ? 'Amazing consistency! 🎉' : currentStreak >= 3 ? 'Great momentum! Keep going!' : 'Start building your streak today!'}`;
 }
 
@@ -826,7 +844,6 @@ function loadCorrelationChart() {
     document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> ${correlationText} ${direction} correlation (r = ${correlation.toFixed(2)}) between hours worked and productivity.<br><br>💡 <strong>Recommendation:</strong> ${recommendation}`;
 }
 
-// New: Load Block Ratings Analysis Chart
 function loadBlockRatingsChart() {
     const history = getHistory();
     const ctx = document.getElementById('blockRatingsChart').getContext('2d');
@@ -836,7 +853,6 @@ function loadBlockRatingsChart() {
         return;
     }
     
-    // Aggregate ratings by block position
     const blockRatingsAggregate = {};
     history.forEach(entry => {
         if (entry.blockRatingsData) {
@@ -867,7 +883,6 @@ function loadBlockRatingsChart() {
         options: { responsive: true, maintainAspectRatio: true, scales: { y: { title: { display: true, text: 'Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, x: { title: { display: true, text: 'Work Blocks' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}/10` } } } }
     });
     
-    // Find hardest and easiest blocks
     const hardestBlock = avgRatings.reduce((minIdx, rating, idx, arr) => rating < arr[minIdx] ? idx : minIdx, 0);
     const easiestBlock = avgRatings.reduce((maxIdx, rating, idx, arr) => rating > arr[maxIdx] ? idx : maxIdx, 0);
     
