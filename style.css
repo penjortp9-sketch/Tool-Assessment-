@@ -16,6 +16,45 @@
     --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
     --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.15);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --bg-gradient-start: #0F3028;
+    --bg-gradient-end: #1B4D3E;
+    --bg-gradient-fallback: #0F3028;
+    --card-bg: #FFFFFF;
+    --input-bg: #F8F9F7;
+    --quote-bg: rgba(255, 255, 255, 0.15);
+    --reflection-bg-start: #F0FDF4;
+    --reflection-bg-end: #FFFBEB;
+    --reminder-bg-start: #EFF6FF;
+    --reminder-bg-end: #F0FDF4;
+}
+
+/* Dark Mode Variables - Applied when data-theme="dark" */
+[data-theme="dark"] {
+    --primary: #3BAF9A;
+    --primary-light: #5CCCB7;
+    --accent: #E8C4A0;
+    --accent-light: #F5D5B0;
+    --bg-light: #1E1E2E;
+    --bg-card: #2D2D3F;
+    --text-dark: #F0F0F0;
+    --text-muted: #A0A0B0;
+    --border-color: #3D3D4F;
+    --success: #34D399;
+    --warning: #FBBF24;
+    --danger: #F87171;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.5);
+    --bg-gradient-start: #0A1F1A;
+    --bg-gradient-end: #14362A;
+    --bg-gradient-fallback: #0A1F1A;
+    --card-bg: #2D2D3F;
+    --input-bg: #252535;
+    --quote-bg: rgba(0, 0, 0, 0.3);
+    --reflection-bg-start: #1A2E24;
+    --reflection-bg-end: #2D2A1F;
+    --reminder-bg-start: #1A2A3A;
+    --reminder-bg-end: #1A2E24;
 }
 
 * {
@@ -30,13 +69,14 @@ html {
 
 body {
     font-family: 'Sora', sans-serif;
-    background: linear-gradient(135deg, #0F3028 0%, #1B4D3E 50%, #0F3028 100%);
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 50%, var(--bg-gradient-start) 100%);
     background-attachment: fixed;
     color: var(--text-dark);
     min-height: 100vh;
     padding: 20px;
     position: relative;
     overflow-x: hidden;
+    transition: background 0.3s ease, color 0.2s ease;
 }
 
 .background-pattern {
@@ -45,19 +85,21 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: radial-gradient(circle at 20% 50%, rgba(42, 127, 111, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212, 165, 116, 0.05) 0%, transparent 50%);
+    background-image: radial-gradient(circle at 20% 50%, rgba(59, 175, 154, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212, 165, 116, 0.05) 0%, transparent 50%);
     pointer-events: none;
     z-index: -1;
+    transition: opacity 0.3s ease;
 }
 
 .container {
     max-width: 800px;
     margin: 0 auto;
-    background: var(--bg-card);
+    background: var(--card-bg);
     border-radius: 20px;
     box-shadow: var(--shadow-lg);
     overflow: hidden;
     animation: fadeInUp 0.6s ease-out;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 @keyframes fadeInUp {
@@ -90,6 +132,17 @@ body {
     50% { opacity: 0.5; transform: scale(1.2); }
 }
 
+/* Theme Toggle Button Animation */
+.theme-toggle-btn {
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-toggle-btn:hover {
+    transform: scale(1.02);
+}
+
 /* Login Screen */
 .login-screen {
     display: flex !important;
@@ -97,17 +150,18 @@ body {
     justify-content: center;
     min-height: 100vh;
     padding: 40px 20px;
-    background: linear-gradient(135deg, #0F3028 0%, #1B4D3E 100%);
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
 }
 
 .login-card {
     width: 100%;
     max-width: 450px;
-    background: var(--bg-card);
+    background: var(--card-bg);
     padding: 60px 40px;
     border-radius: 20px;
     box-shadow: var(--shadow-lg);
     animation: slideInDown 0.6s ease-out;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .login-header {
@@ -164,14 +218,14 @@ body {
     font-family: 'Sora', sans-serif;
     font-size: 1rem;
     color: var(--text-dark);
-    background: var(--bg-light);
+    background: var(--input-bg);
     transition: var(--transition);
 }
 
 .form-input:focus, .form-textarea:focus, .filter-input:focus {
     outline: none;
     border-color: var(--primary);
-    background: var(--bg-card);
+    background: var(--card-bg);
     box-shadow: 0 0 0 4px rgba(27, 77, 62, 0.1);
     transform: translateY(-1px);
 }
@@ -222,8 +276,17 @@ body {
     border: 1.5px solid #FECACA;
 }
 
+[data-theme="dark"] .btn-danger {
+    background: #4A1A1A;
+    border-color: #7A2E2E;
+}
+
 .btn-danger:hover {
     background: #FECACA;
+}
+
+[data-theme="dark"] .btn-danger:hover {
+    background: #6A2A2A;
 }
 
 .btn-icon {
@@ -260,11 +323,16 @@ body {
     padding: 4px 8px;
     border-radius: 6px;
     transition: var(--transition);
+    color: var(--text-dark);
 }
 
 .btn-icon-small:hover {
     background: rgba(0,0,0,0.05);
     transform: rotate(30deg);
+}
+
+[data-theme="dark"] .btn-icon-small:hover {
+    background: rgba(255,255,255,0.1);
 }
 
 /* Header */
@@ -306,7 +374,7 @@ body {
 
 /* Quote Card */
 .quote-card {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--quote-bg);
     border: 1px solid rgba(255, 255, 255, 0.25);
     padding: 20px;
     border-radius: 12px;
@@ -324,8 +392,8 @@ body {
 
 /* Reminder Settings */
 .reminder-settings-card {
-    background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%);
-    border: 1.5px solid #BFDBFE;
+    background: linear-gradient(135deg, var(--reminder-bg-start) 0%, var(--reminder-bg-end) 100%);
+    border: 1.5px solid var(--border-color);
     border-radius: 12px;
     padding: 16px 20px;
     margin: 20px 40px;
@@ -376,6 +444,8 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-family: 'Sora', sans-serif;
+    background: var(--input-bg);
+    color: var(--text-dark);
 }
 
 .notification-hint {
@@ -387,7 +457,7 @@ body {
 
 /* Work Time Suggestion Card */
 .work-time-suggestion-card {
-    background: linear-gradient(135deg, #1B4D3E 0%, #2A7F6F 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
     color: white;
     padding: 20px;
     border-radius: 12px;
@@ -490,10 +560,11 @@ body {
     border-left: 4px solid var(--primary);
     transition: var(--transition);
     animation: slideInLeft 0.4s ease-out;
+    color: var(--text-dark);
 }
 
 .task-list li:hover {
-    background: #EFEFED;
+    background: var(--border-color);
     transform: translateX(4px);
 }
 
@@ -574,7 +645,7 @@ body {
 }
 
 .summary-item {
-    background: var(--bg-card);
+    background: var(--card-bg);
     padding: 16px;
     border-radius: 12px;
     text-align: center;
@@ -600,7 +671,7 @@ body {
 }
 
 .summary-blocks {
-    background: var(--bg-card);
+    background: var(--card-bg);
     padding: 16px;
     border-radius: 12px;
     margin-bottom: 15px;
@@ -609,8 +680,8 @@ body {
 
 /* Reflection Card */
 .reflection-card {
-    background: linear-gradient(135deg, #F0FDF4 0%, #FFFBEB 100%);
-    border: 1.5px solid #D4EDDA;
+    background: linear-gradient(135deg, var(--reflection-bg-start) 0%, var(--reflection-bg-end) 100%);
+    border: 1.5px solid var(--border-color);
     padding: 30px;
     border-radius: 16px;
     margin: 0 40px 40px 40px;
@@ -623,10 +694,11 @@ body {
 .lessons-list li {
     padding: 16px;
     margin-bottom: 12px;
-    background: white;
+    background: var(--card-bg);
     border-radius: 10px;
     border-left: 4px solid var(--success);
     animation: fadeIn 0.6s ease-out;
+    color: var(--text-dark);
 }
 
 .lessons-list strong {
@@ -690,7 +762,7 @@ body {
 
 /* Charts Section */
 .charts-section {
-    background: var(--bg-card);
+    background: var(--card-bg);
     border-radius: 16px;
     padding: 25px;
     margin-bottom: 30px;
@@ -862,7 +934,7 @@ body {
 
 .history-item:hover {
     border-color: var(--primary);
-    background: #FFFFFF;
+    background: var(--card-bg);
     transform: translateY(-4px);
     box-shadow: var(--shadow-md);
 }
@@ -931,7 +1003,7 @@ body {
 }
 
 .modal-content {
-    background: var(--bg-card);
+    background: var(--card-bg);
     border-radius: 16px;
     padding: 30px;
     max-width: 600px;
@@ -1045,7 +1117,7 @@ body {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: var(--bg-card);
+    background: var(--card-bg);
     border-left: 4px solid var(--primary);
     padding: 16px 20px;
     border-radius: 12px;
