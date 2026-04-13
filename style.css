@@ -28,7 +28,7 @@
     --reminder-bg-end: #F0FDF4;
 }
 
-/* Dark Mode Variables - Applied when data-theme="dark" */
+/* Dark Mode Variables */
 [data-theme="dark"] {
     --primary: #3BAF9A;
     --primary-light: #5CCCB7;
@@ -132,7 +132,7 @@ body {
     50% { opacity: 0.5; transform: scale(1.2); }
 }
 
-/* Theme Toggle Button Animation */
+/* Theme Toggle Button */
 .theme-toggle-btn {
     transition: var(--transition);
     position: relative;
@@ -590,19 +590,14 @@ body {
     gap: 15px;
 }
 
-.range-slider::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    cursor: pointer;
-    border: none;
-}
-
-.range-slider::-moz-range-track {
+.range-slider {
+    flex: 1;
     height: 8px;
+    -webkit-appearance: none;
+    appearance: none;  /* ← ADD THIS LINE */
     background: var(--border-color);
     border-radius: 4px;
+    outline: none;
 }
 
 .range-slider::-webkit-slider-thumb {
@@ -618,6 +613,21 @@ body {
 
 .range-slider::-webkit-slider-thumb:hover {
     transform: scale(1.2);
+}
+
+.range-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    cursor: pointer;
+    border: none;
+}
+
+.range-slider::-moz-range-track {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
 }
 
 .rating-display {
@@ -710,6 +720,62 @@ body {
 .lessons-list strong {
     color: var(--primary);
     font-weight: 700;
+}
+
+/* Block Assignment & Rating Styles */
+.block-assign-row {
+    transition: var(--transition);
+}
+
+.block-assign-row:hover {
+    transform: translateX(4px);
+}
+
+.btn-rate-block {
+    padding: 8px 16px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: var(--transition);
+}
+
+.btn-rate-block:hover {
+    transform: scale(1.05);
+    background: var(--primary-light);
+}
+
+.block-task-select {
+    cursor: pointer;
+}
+
+.block-rating-summary {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.rating-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.rating-high {
+    background: #10B981;
+    color: white;
+}
+
+.rating-medium {
+    background: #F59E0B;
+    color: white;
+}
+
+.rating-low {
+    background: #EF4444;
+    color: white;
 }
 
 /* History Screen */
@@ -1118,6 +1184,11 @@ body {
 .hidden { display: none !important; }
 .screen.hidden { display: none !important; }
 
+/* Rating Modal Overlay */
+#rating-modal-overlay {
+    animation: fadeIn 0.3s ease-out;
+}
+
 /* Permission Toast */
 .permission-toast {
     position: fixed;
@@ -1169,6 +1240,8 @@ body {
     .heatmap-day { padding: 8px 4px; font-size: 0.7rem; }
     .chart-container canvas { max-height: 300px; }
     .reminder-settings-card, .work-time-suggestion-card { margin: 15px 20px; padding: 12px 16px; }
+    .block-assign-row { flex-direction: column; align-items: stretch !important; }
+    .btn-rate-block { width: 100%; }
 }
 
 @media (max-width: 480px) {

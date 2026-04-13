@@ -1,6 +1,6 @@
 // ============================================
-// COMPLETE JAVASCRIPT - FULLY FUNCTIONAL ANALYTICS DASHBOARD
-// INCLUDING DARK/LIGHT MODE TOGGLE & BLOCK ASSIGNMENT
+// COMPLETE JAVASCRIPT - WITH BLOCK RATINGS SYSTEM
+// INCLUDING DARK/LIGHT MODE TOGGLE & BLOCK ASSIGNMENT WITH RATINGS
 // ============================================
 
 // State Management
@@ -10,11 +10,13 @@ let filteredHistoryData = [];
 let productivityChart = null;
 let moodChart = null;
 let correlationChart = null;
+let blockRatingsChart = null;
 let notificationPermissionGranted = false;
 let reminderCheckInterval = null;
 
-// NEW: Store block-specific assignment
+// Block Assignment & Rating Storage
 let blockAssignmentMap = {};
+let blockRatingMap = {};
 let blockAssignmentFinished = false;
 
 // ============================================
@@ -49,6 +51,7 @@ function updateThemeButtons(currentTheme) {
 }
 
 function getSavedTheme() { return localStorage.getItem('theme') || 'auto'; }
+
 function initTheme() {
     const savedTheme = getSavedTheme();
     if (savedTheme === 'dark') applyTheme('dark');
@@ -58,6 +61,7 @@ function initTheme() {
         if (getSavedTheme() === 'auto') applyTheme('auto');
     });
 }
+
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme');
     if (currentTheme === 'dark') { applyTheme('light'); showAlert('☀️ Light mode activated', 'success'); }
@@ -123,41 +127,7 @@ function removeTask(index) {
     document.getElementById('assignmentStatusMsg').innerHTML = '';
 }
 
-// Block Assignment UI
-function renderBlockAssignmentUI() {
-    const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
-    const container = document.getElementById('blockAssignmentContainer');
-    if (!container) return;
-    if (taskList.length === 0) {
-        container.innerHTML = `<div style="padding: 12px; background: var(--bg-light); border-radius: 12px; color: var(--text-muted);"><span>⚠️ Add at least one task above to assign to blocks.</span></div>`;
-        return;
-    }
-    let html = `<div style="display: flex; flex-direction: column; gap: 14px;">`;
-    for (let i = 0; i < blocksCount; i++) {
-        const currentBlockName = getBlockNameByIndex(i);
-        const selectedVal = blockAssignmentMap[i] || '';
-        html += `<div class="block-assign-row" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--card-bg); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-color);">
-                    <strong style="min-width: 110px;">📌 ${escapeHtml(currentBlockName)}</strong>
-                    <select data-block-index="${i}" class="block-task-select" style="flex:1; padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-dark);">
-                        <option value="">— Select a task —</option>
-                        ${taskList.map(task => `<option value="${escapeHtml(task)}" ${selectedVal === task ? 'selected' : ''}>${escapeHtml(task)}</option>`).join('')}
-                    </select>
-                </div>`;
-    }
-    html += `</div>`;
-    container.innerHTML = html;
-    document.querySelectorAll('.block-task-select').forEach(select => {
-        select.addEventListener('change', (e) => {
-            const blockIdx = parseInt(select.getAttribute('data-block-index'));
-            const selectedTask = select.value;
-            if (selectedTask) blockAssignmentMap[blockIdx] = selectedTask;
-            else delete blockAssignmentMap[blockIdx];
-            blockAssignmentFinished = false;
-            document.getElementById('assignmentStatusMsg').innerHTML = '';
-        });
-    });
-}
-
+// Get block name by index
 function getBlockNameByIndex(idx) {
     const blockTasksRaw = document.getElementById('block-tasks').value;
     if (!blockTasksRaw) return `Block ${idx+1}`;
@@ -166,26 +136,199 @@ function getBlockNameByIndex(idx) {
     return `Block ${idx+1}`;
 }
 
-function finalizeBlockAssignments() {
+// Render Block Assignment UI with Rating Buttons
+function renderBlockAssignmentUI() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
-    const missingBlocks = [];
-    for (let i = 0; i < blocksCount; i++) {
-        if (!blockAssignmentMap[i]) missingBlocks.push(i+1);
-    }
-    if (missingBlocks.length > 0) {
-        showAlert(`⚠️ Please assign a task to Block(s) ${missingBlocks.join(', ')} before finishing.`, "error");
-        return false;
-    }
+    const container = document.getElementById('blockAssignmentContainer');
+    if (!container) return;
+    
     if (taskList.length === 0) {
-        showAlert("❌ Please add at least one task before assigning.", "error");
-        return false;
+        container.innerHTML = `<div style="padding: 12px; background: var(--bg-light); border-radius: 12px; color: var(--text-muted);"><span>⚠️ Add at least one task above to assign to blocks.</span></div>`;
+        document.getElementById('blockRatingSummary').style.display = 'none';
+        return;
     }
-    blockAssignmentFinished = true;
-    document.getElementById('assignmentStatusMsg').innerHTML = '✅ Block assignments finalized! You can now rate productivity.';
-    showAlert("✅ Great! Block tasks assigned. You can now rate your expected productivity.", "success");
-    return true;
+    
+    let html = `<div style="display: flex; flex-direction: column; gap: 14px;">`;
+    for (let i = 0; i < blocksCount; i++) {
+        const currentBlockName = getBlockNameByIndex(i);
+        const selectedVal = blockAssignmentMap[i] || '';
+        const currentRating = blockRatingMap[i] || '';
+        
+        html += `<div class="block-assign-row" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--card-bg); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <strong style="min-width: 110px;">📌 ${escapeHtml(currentBlockName)}</strong>
+                    <select data-block-index="${i}" class="block-task-select" style="flex:1; padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-dark);">
+                        <option value="">— Select a task —</option>
+                        ${taskList.map(task => `<option value="${escapeHtml(task)}" ${selectedVal === task ? 'selected' : ''}>${escapeHtml(task)}</option>`).join('')}
+                    </select>
+                    <button type="button" class="btn-rate-block" data-block="${i}" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: all 0.3s ease;">
+                        ${currentRating ? `⭐ ${currentRating}/10` : 'Rate →'}
+                    </button>
+                </div>`;
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+    
+    // Add event listeners for selects
+    document.querySelectorAll('.block-task-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const blockIdx = parseInt(select.getAttribute('data-block-index'));
+            const selectedTask = select.value;
+            if (selectedTask) blockAssignmentMap[blockIdx] = selectedTask;
+            else delete blockAssignmentMap[blockIdx];
+            blockAssignmentFinished = false;
+            document.getElementById('assignmentStatusMsg').innerHTML = '';
+            updateRatingSummary();
+        });
+    });
+    
+    // Add event listeners for rate buttons
+    document.querySelectorAll('.btn-rate-block').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const blockIdx = parseInt(btn.getAttribute('data-block'));
+            showRatingModal(blockIdx);
+        });
+    });
+    
+    updateRatingSummary();
 }
 
+// Show rating modal for individual block
+function showRatingModal(blockIdx) {
+    const blockName = getBlockNameByIndex(blockIdx);
+    const currentRating = blockRatingMap[blockIdx] || '';
+    const assignedTask = blockAssignmentMap[blockIdx] || '';
+    
+    if (!assignedTask) {
+        showAlert(`⚠️ Please select a task for ${blockName} first!`, "error");
+        return;
+    }
+    
+    // Create modal for rating
+    const modalHtml = `
+        <div id="rating-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);">
+            <div style="background: var(--card-bg); padding: 30px; border-radius: 20px; max-width: 400px; width: 90%; animation: slideInUp 0.3s ease-out;">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">⭐ Rate ${escapeHtml(blockName)}</h3>
+                <p style="margin-bottom: 20px; color: var(--text-muted);">Task: <strong>${escapeHtml(assignedTask)}</strong></p>
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Difficulty/Importance (1-10):</label>
+                    <input type="range" id="block-rating-slider" min="1" max="10" value="${currentRating || 5}" style="width: 100%; margin: 10px 0;">
+                    <div style="text-align: center; font-size: 1.5rem; font-weight: bold; color: var(--primary);">
+                        <span id="rating-value-display">${currentRating || 5}</span>/10
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 10px; justify-content: center; font-size: 0.85rem;">
+                        <span>😴 Easy</span>
+                        <span style="flex:1; text-align: center;">⚖️ Medium</span>
+                        <span>🔥 Challenging</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="saveBlockRating(${blockIdx})" class="btn btn-primary" style="flex:1;">Save Rating</button>
+                    <button onclick="closeRatingModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    closeRatingModal();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    const slider = document.getElementById('block-rating-slider');
+    const display = document.getElementById('rating-value-display');
+    if (slider && display) {
+        slider.addEventListener('input', () => {
+            display.textContent = slider.value;
+        });
+    }
+}
+
+// Save rating for a block
+function saveBlockRating(blockIdx) {
+    const slider = document.getElementById('block-rating-slider');
+    if (slider) {
+        const rating = parseInt(slider.value);
+        blockRatingMap[blockIdx] = rating;
+        showAlert(`✅ Rating saved for Block ${blockIdx + 1}: ${rating}/10`, "success");
+        closeRatingModal();
+        renderBlockAssignmentUI();
+    }
+}
+
+// Close rating modal
+function closeRatingModal() {
+    const existingModal = document.getElementById('rating-modal-overlay');
+    if (existingModal) existingModal.remove();
+}
+
+// Update rating summary display
+function updateRatingSummary() {
+    const summaryDiv = document.getElementById('blockRatingSummary');
+    const summaryText = document.getElementById('ratingsSummaryText');
+    
+    if (Object.keys(blockRatingMap).length > 0) {
+        summaryDiv.style.display = 'block';
+        let summary = '';
+        for (let i = 0; i < Object.keys(blockAssignmentMap).length; i++) {
+            if (blockRatingMap[i]) {
+                const rating = blockRatingMap[i];
+                let ratingClass = rating >= 8 ? 'rating-high' : (rating >= 5 ? 'rating-medium' : 'rating-low');
+                summary += `<span class="rating-badge ${ratingClass}" style="margin-right: 8px; margin-bottom: 5px; display: inline-block;">Block ${i+1}: ${rating}/10</span>`;
+            }
+        }
+        summaryText.innerHTML = summary || 'No ratings yet';
+    } else {
+        summaryDiv.style.display = 'none';
+    }
+}
+
+// Show all ratings in a modal
+function showAllRatingsModal() {
+    let ratingsHtml = '<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">⭐ Block Ratings Summary</h3>';
+    for (let i = 0; i < Object.keys(blockAssignmentMap).length; i++) {
+        if (blockAssignmentMap[i]) {
+            const task = blockAssignmentMap[i];
+            const rating = blockRatingMap[i] || 'Not rated';
+            const ratingClass = rating >= 8 ? 'rating-high' : (rating >= 5 ? 'rating-medium' : 'rating-low');
+            ratingsHtml += `
+                <div style="padding: 12px; margin-bottom: 10px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid var(--primary);">
+                    <strong>Block ${i+1}:</strong> ${escapeHtml(task)}<br>
+                    <span class="rating-badge ${ratingClass}" style="margin-top: 5px; display: inline-block;">⭐ ${rating}/10</span>
+                </div>
+            `;
+        }
+    }
+    ratingsHtml += '</div>';
+    
+    const modalHtml = `
+        <div id="ratings-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);">
+            <div style="background: var(--card-bg); padding: 30px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; animation: slideInUp 0.3s ease-out;">
+                ${ratingsHtml}
+                <button onclick="closeRatingsModal()" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Close</button>
+            </div>
+        </div>
+    `;
+    
+    closeRatingsModal();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeRatingsModal() {
+    const existingModal = document.getElementById('ratings-modal-overlay');
+    if (existingModal) existingModal.remove();
+}
+
+// Reset all block assignments and ratings
+function resetAllBlockAssignments() {
+    if (confirm('Are you sure you want to reset all block assignments and ratings?')) {
+        blockAssignmentMap = {};
+        blockRatingMap = {};
+        blockAssignmentFinished = false;
+        document.getElementById('assignmentStatusMsg').innerHTML = '';
+        renderBlockAssignmentUI();
+        showAlert('🔄 All block assignments and ratings have been reset', 'success');
+    }
+}
+
+// Auto generate blocks
 function autoGenerateBlocksManual() {
     const total = parseFloat(document.getElementById("total-hours").value) || 0;
     const blocks = parseInt(document.getElementById("blocks").value) || 1;
@@ -197,9 +340,43 @@ function autoGenerateBlocksManual() {
     blockTasksInput.style.borderColor = '#10B981';
     setTimeout(() => blockTasksInput.style.borderColor = '', 2000);
     blockAssignmentMap = {};
+    blockRatingMap = {};
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     renderBlockAssignmentUI();
+}
+
+// Finalize block assignments with rating validation
+function finalizeBlockAssignments() {
+    const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
+    const missingBlocks = [];
+    const unratedBlocks = [];
+    
+    for (let i = 0; i < blocksCount; i++) {
+        if (!blockAssignmentMap[i]) {
+            missingBlocks.push(i+1);
+        } else if (!blockRatingMap[i]) {
+            unratedBlocks.push(i+1);
+        }
+    }
+    
+    if (missingBlocks.length > 0) {
+        showAlert(`⚠️ Please assign a task to Block(s) ${missingBlocks.join(', ')} before finishing.`, "error");
+        return false;
+    }
+    
+    if (unratedBlocks.length > 0) {
+        if (confirm(`⚠️ Block(s) ${unratedBlocks.join(', ')} have no ratings. Do you want to rate them now?`)) {
+            showRatingModal(unratedBlocks[0] - 1);
+            return false;
+        }
+        showAlert("⚠️ Proceeding without ratings for some blocks.", "warning");
+    }
+    
+    blockAssignmentFinished = true;
+    document.getElementById('assignmentStatusMsg').innerHTML = '✅ Block assignments finalized! You can now rate productivity.';
+    showAlert("✅ Great! Block tasks assigned. You can now rate your expected productivity.", "success");
+    return true;
 }
 
 // Login/Logout
@@ -225,6 +402,7 @@ function logout() {
     document.getElementById("summary").classList.add("hidden");
     taskList = [];
     blockAssignmentMap = {};
+    blockRatingMap = {};
     blockAssignmentFinished = false;
 }
 
@@ -235,6 +413,7 @@ function setupEventListeners() {
     const ratingSlider = document.getElementById("productivity");
     const ratingValue = document.getElementById("rating-value");
     const taskInput = document.getElementById("task-input");
+    
     function autoGenerateBlocks() {
         const total = parseFloat(totalHoursInput.value) || 0;
         const blocks = parseInt(blocksInput.value) || 1;
@@ -246,6 +425,7 @@ function setupEventListeners() {
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
     }
+    
     totalHoursInput.addEventListener("input", autoGenerateBlocks);
     blocksInput.addEventListener("input", autoGenerateBlocks);
     ratingSlider.addEventListener("input", () => ratingValue.textContent = ratingSlider.value);
@@ -263,36 +443,60 @@ function saveEntry() {
     const productivity = document.getElementById("productivity").value;
     const comments = document.getElementById("comments").value.trim();
     const mood = document.getElementById("selected-mood").value;
+    
     if (!tasks) { showAlert("❌ Please add at least one task today.", "error"); return; }
     if (!blockTasks) { showAlert("❌ Please divide your work into blocks.", "error"); return; }
     if (!blockAssignmentFinished) {
         showAlert("📋 Before rating productivity, please click 'Mark Block Tasks as Finished' to confirm which task you'll work on in each block.", "error");
         return;
     }
+    
     const blocksCount = parseInt(blocks);
     let assignmentText = "";
-    for (let i=0; i<blocksCount; i++) {
+    let ratingsText = "";
+    let totalRatingSum = 0;
+    let ratedBlocks = 0;
+    
+    for (let i = 0; i < blocksCount; i++) {
         const blockLabel = getBlockNameByIndex(i);
         const assignedTask = blockAssignmentMap[i] || "Not assigned";
+        const rating = blockRatingMap[i] || "Not rated";
         assignmentText += `${blockLabel} → ${assignedTask}; `;
+        ratingsText += `${blockLabel} (${assignedTask}): ${rating}/10; `;
+        if (rating !== "Not rated") {
+            totalRatingSum += rating;
+            ratedBlocks++;
+        }
     }
+    
+    const averageBlockRating = ratedBlocks > 0 ? (totalRatingSum / ratedBlocks).toFixed(1) : "N/A";
     const hoursPerBlock = (parseFloat(totalHours) / parseInt(blocks)).toFixed(1);
-    displaySummary({ tasks, blockTasks, totalHours, blocks, hoursPerBlock, productivity, comments, mood, assignmentText });
-    generateLessons(mood, tasks, productivity, comments, assignmentText);
+    
+    displaySummary({ tasks, blockTasks, totalHours, blocks, hoursPerBlock, productivity, comments, mood, assignmentText, ratingsText, averageBlockRating });
+    generateLessons(mood, tasks, productivity, comments, assignmentText, ratingsText, averageBlockRating);
+    
     const entryData = {
         date: new Date().toLocaleDateString(),
         time: new Date().toLocaleTimeString(),
         tasks, mood, blockTasks, totalHours, blocks, hoursPerBlock, productivity, comments,
         blockAssignment: assignmentText,
+        blockRatings: ratingsText,
+        averageBlockRating: averageBlockRating,
+        blockRatingsData: blockRatingMap,
         timestamp: new Date().toISOString(),
         id: Date.now()
     };
+    
     saveToHistory(entryData);
     localStorage.setItem("lastLogDate", new Date().toLocaleDateString());
     showAlert("✅ Today's entry saved successfully!", "success");
     setTimeout(() => { displayWorkTimeSuggestion(); }, 500);
     setTimeout(() => document.getElementById("summary").scrollIntoView({ behavior: "smooth" }), 300);
+    
+    // Reset for next day
     blockAssignmentFinished = false;
+    blockAssignmentMap = {};
+    blockRatingMap = {};
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     renderBlockAssignmentUI();
 }
@@ -305,23 +509,26 @@ function displaySummary(data) {
     document.getElementById("sum-per-block").textContent = data.hoursPerBlock;
     document.getElementById("sum-rating").textContent = `${data.productivity}/10`;
     document.getElementById("sum-comments").textContent = data.comments || "No notes added.";
-    document.getElementById("sum-block-assignment").textContent = data.assignmentText || "No assignment recorded";
+    document.getElementById("sum-block-assignment").innerHTML = `<strong>Tasks & Ratings:</strong><br>${data.ratingsText || data.assignmentText || "No assignment recorded"}<br><br><strong>Average Block Rating:</strong> ${data.averageBlockRating || "N/A"}/10`;
     document.getElementById("summary").classList.remove("hidden");
 }
 
-function generateLessons(mood, tasks, productivity, comments, assignmentText) {
+function generateLessons(mood, tasks, productivity, comments, assignmentText, ratingsText, averageBlockRating) {
     let feedback = "", icon = "📌";
     if (productivity >= 9) { feedback = "Excellent! You were highly focused and productive today."; icon = "🚀"; }
     else if (productivity >= 6) { feedback = "Good job! Small improvements can make it even better next time."; icon = "⭐"; }
     else if (productivity >= 4) { feedback = "Fair effort. Try reducing distractions and planning better tomorrow."; icon = "🎯"; }
     else { feedback = "Room for improvement. Focus on planning and minimizing interruptions."; icon = "💪"; }
+    
     let moodEmoji = mood, moodText = "focused";
     if (mood === "😊") moodText = "happy and positive";
     if (mood === "😴") moodText = "tired";
+    
     document.getElementById("lessons-list").innerHTML = `
         <li><strong>🌅 Morning Mood:</strong> You started the day feeling ${moodEmoji} (${moodText})</li>
         <li><strong>📋 Plan Execution:</strong> You worked on: ${escapeHtml(tasks)}</li>
-        <li><strong>🎯 Block Plan:</strong> ${escapeHtml(assignmentText)}</li>
+        <li><strong>🎯 Block Plan & Ratings:</strong> ${escapeHtml(ratingsText || assignmentText)}</li>
+        <li><strong>⭐ Average Block Difficulty:</strong> ${averageBlockRating || "N/A"}/10</li>
         <li><strong>📊 Progress:</strong> ${feedback}</li>
         <li><strong>${icon} Key Takeaway:</strong> ${escapeHtml(comments) || "Every day is a chance to improve your productivity."}</li>
     `;
@@ -345,6 +552,7 @@ function showHistoryScreen() {
         loadMoodDistributionChart();
         loadHeatmapCalendar();
         loadCorrelationChart();
+        loadBlockRatingsChart();
     }, 100);
 }
 
@@ -373,7 +581,16 @@ function calculateStatistics(history) {
     const moodCounts = {};
     history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
     const mostCommonMood = Object.keys(moodCounts).reduce((a, b) => moodCounts[a] > moodCounts[b] ? a : b, "🔥");
-    statsGrid.innerHTML = `<div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><span class="stat-label">Total Entries</span><span class="stat-number">${history.length}</span></div></div><div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Productivity</span><span class="stat-number">${avgProductivity}</span><span class="stat-unit">/10</span></div></div><div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><span class="stat-label">Avg Work Hours</span><span class="stat-number">${avgHours}</span><span class="stat-unit">h</span></div></div><div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-content"><span class="stat-label">Most Common Mood</span><span class="stat-number">${mostCommonMood}</span></div></div>`;
+    
+    // Calculate average block rating if available
+    const validBlockRatings = history.filter(h => h.averageBlockRating && h.averageBlockRating !== "N/A").map(h => parseFloat(h.averageBlockRating));
+    const avgBlockRating = validBlockRatings.length > 0 ? (validBlockRatings.reduce((a,b) => a+b, 0) / validBlockRatings.length).toFixed(1) : "N/A";
+    
+    statsGrid.innerHTML = `<div class="stat-card"><div class="stat-icon">📋</div><div class="stat-content"><span class="stat-label">Total Entries</span><span class="stat-number">${history.length}</span></div></div>
+                          <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Productivity</span><span class="stat-number">${avgProductivity}</span><span class="stat-unit">/10</span></div></div>
+                          <div class="stat-card"><div class="stat-icon">⏱️</div><div class="stat-content"><span class="stat-label">Avg Work Hours</span><span class="stat-number">${avgHours}</span><span class="stat-unit">h</span></div></div>
+                          <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-content"><span class="stat-label">Avg Block Rating</span><span class="stat-number">${avgBlockRating}</span><span class="stat-unit">/10</span></div></div>
+                          <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-content"><span class="stat-label">Most Common Mood</span><span class="stat-number">${mostCommonMood}</span></div></div>`;
 }
 
 function displayHistoryList(historyData) {
@@ -382,7 +599,22 @@ function displayHistoryList(historyData) {
         historyList.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>`;
         return;
     }
-    historyList.innerHTML = historyData.map(entry => `<div class="history-item" onclick="showDetailModal('${entry.id}')"><div class="history-item-header"><div class="history-date"><span class="date-day">${new Date(entry.timestamp).toLocaleDateString('en-GB', {weekday: 'short'})}</span><span class="date-full">${entry.date}</span><span class="date-time">${entry.time}</span></div><div class="history-mood">${entry.mood}</div></div><div class="history-item-content"><div class="history-quick-stats"><div class="quick-stat"><span class="stat-icon">⏱️</span><span class="stat-text">${entry.totalHours}h</span></div><div class="quick-stat"><span class="stat-icon">📊</span><span class="stat-text">${entry.productivity}/10</span></div><div class="quick-stat"><span class="stat-icon">📦</span><span class="stat-text">${entry.blocks} blocks</span></div></div><p class="history-tasks"><strong>Tasks:</strong> ${escapeHtml(entry.tasks.substring(0, 60))}${entry.tasks.length > 60 ? '...' : ''}</p></div><div class="history-item-action"><span class="view-details">View Details →</span></div></div>`).join('');
+    historyList.innerHTML = historyData.map(entry => `<div class="history-item" onclick="showDetailModal('${entry.id}')">
+        <div class="history-item-header">
+            <div class="history-date"><span class="date-day">${new Date(entry.timestamp).toLocaleDateString('en-GB', {weekday: 'short'})}</span>
+            <span class="date-full">${entry.date}</span><span class="date-time">${entry.time}</span></div>
+            <div class="history-mood">${entry.mood}</div>
+        </div>
+        <div class="history-item-content">
+            <div class="history-quick-stats">
+                <div class="quick-stat"><span class="stat-icon">⏱️</span><span class="stat-text">${entry.totalHours}h</span></div>
+                <div class="quick-stat"><span class="stat-icon">📊</span><span class="stat-text">${entry.productivity}/10</span></div>
+                <div class="quick-stat"><span class="stat-icon">⭐</span><span class="stat-text">${entry.averageBlockRating || "N/A"}/10</span></div>
+            </div>
+            <p class="history-tasks"><strong>Tasks:</strong> ${escapeHtml(entry.tasks.substring(0, 60))}${entry.tasks.length > 60 ? '...' : ''}</p>
+        </div>
+        <div class="history-item-action"><span class="view-details">View Details →</span></div>
+    </div>`).join('');
 }
 
 function filterHistory() {
@@ -403,7 +635,16 @@ function showDetailModal(entryId) {
     const history = getHistory();
     const entry = history.find(h => h.id == entryId);
     if (!entry) return;
-    document.getElementById("detail-content").innerHTML = `<div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${entry.time}</p></div><div class="detail-grid"><div class="detail-item"><span class="detail-label">Mood</span><span class="detail-value">${entry.mood}</span></div><div class="detail-item"><span class="detail-label">Productivity</span><span class="detail-value">${entry.productivity}/10</span></div><div class="detail-item"><span class="detail-label">Work Hours</span><span class="detail-value">${entry.totalHours}h</span></div><div class="detail-item"><span class="detail-label">Blocks</span><span class="detail-value">${entry.blocks}</span></div></div><div class="detail-section"><h3>📋 Tasks</h3><p>${escapeHtml(entry.tasks)}</p></div><div class="detail-section"><h3>⏱️ Block Assignment</h3><p>${escapeHtml(entry.blockAssignment || "No details")}</p></div><div class="detail-section"><h3>📝 Notes</h3><p>${escapeHtml(entry.comments) || 'No notes added.'}</p></div><div class="detail-actions"><button onclick="deleteHistoryEntry(${entry.id})" class="btn btn-secondary btn-danger">🗑️ Delete Entry</button></div>`;
+    document.getElementById("detail-content").innerHTML = `<div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${entry.time}</p></div>
+    <div class="detail-grid"><div class="detail-item"><span class="detail-label">Mood</span><span class="detail-value">${entry.mood}</span></div>
+    <div class="detail-item"><span class="detail-label">Productivity</span><span class="detail-value">${entry.productivity}/10</span></div>
+    <div class="detail-item"><span class="detail-label">Work Hours</span><span class="detail-value">${entry.totalHours}h</span></div>
+    <div class="detail-item"><span class="detail-label">Blocks</span><span class="detail-value">${entry.blocks}</span></div>
+    <div class="detail-item"><span class="detail-label">Avg Block Rating</span><span class="detail-value">${entry.averageBlockRating || "N/A"}/10</span></div></div>
+    <div class="detail-section"><h3>📋 Tasks</h3><p>${escapeHtml(entry.tasks)}</p></div>
+    <div class="detail-section"><h3>⏱️ Block Assignment & Ratings</h3><p>${escapeHtml(entry.blockRatings || entry.blockAssignment || "No details")}</p></div>
+    <div class="detail-section"><h3>📝 Notes</h3><p>${escapeHtml(entry.comments) || 'No notes added.'}</p></div>
+    <div class="detail-actions"><button onclick="deleteHistoryEntry(${entry.id})" class="btn btn-secondary btn-danger">🗑️ Delete Entry</button></div>`;
     document.getElementById("detail-modal").classList.remove("hidden");
 }
 
@@ -439,7 +680,7 @@ function showAlert(message, type = "info") {
 }
 
 // ============================================
-// ANALYTICS DASHBOARD - FULLY FUNCTIONAL CHARTS
+// ANALYTICS DASHBOARD - WITH BLOCK RATINGS CHART
 // ============================================
 
 function switchChartTab(tabName, event) {
@@ -451,6 +692,7 @@ function switchChartTab(tabName, event) {
     else if (tabName === 'mood') loadMoodDistributionChart();
     else if (tabName === 'heatmap') loadHeatmapCalendar();
     else if (tabName === 'correlation') loadCorrelationChart();
+    else if (tabName === 'blockratings') loadBlockRatingsChart();
 }
 
 function loadProductivityTrendChart() {
@@ -466,14 +708,17 @@ function loadProductivityTrendChart() {
     const labels = recentData.map(entry => { const d = new Date(entry.timestamp); return `${d.getMonth()+1}/${d.getDate()}`; });
     const productivityData = recentData.map(entry => parseInt(entry.productivity));
     const hoursData = recentData.map(entry => parseFloat(entry.totalHours));
+    const blockRatingData = recentData.map(entry => entry.averageBlockRating && entry.averageBlockRating !== "N/A" ? parseFloat(entry.averageBlockRating) : null);
+    
     if (productivityChart) productivityChart.destroy();
     productivityChart = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets: [
             { label: 'Productivity Rating', data: productivityData, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', yAxisID: 'y' },
-            { label: 'Hours Worked', data: hoursData, borderColor: '#D4A574', backgroundColor: 'rgba(212, 165, 116, 0.1)', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#D4A574', pointBorderColor: '#fff', yAxisID: 'y1' }
+            { label: 'Hours Worked', data: hoursData, borderColor: '#D4A574', backgroundColor: 'rgba(212, 165, 116, 0.1)', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#D4A574', pointBorderColor: '#fff', yAxisID: 'y1' },
+            { label: 'Avg Block Rating', data: blockRatingData, borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.4, fill: false, pointRadius: 4, pointBackgroundColor: '#F59E0B', pointBorderColor: '#fff', yAxisID: 'y' }
         ] },
-        options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', labels: { font: { family: 'Sora', size: 12 } } }, tooltip: { callbacks: { label: function(ctx) { return `${ctx.dataset.label}: ${ctx.raw}${ctx.dataset.label.includes('Productivity') ? '/10' : ' hours'}`; } } } }, scales: { y: { title: { display: true, text: 'Productivity Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, y1: { position: 'right', title: { display: true, text: 'Hours Worked' }, grid: { drawOnChartArea: false } }, x: { title: { display: true, text: 'Date' }, ticks: { maxRotation: 45, minRotation: 45 } } } }
+        options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', labels: { font: { family: 'Sora', size: 12 } } }, tooltip: { callbacks: { label: function(ctx) { return `${ctx.dataset.label}: ${ctx.raw}${ctx.dataset.label.includes('Productivity') || ctx.dataset.label.includes('Rating') ? '/10' : ' hours'}`; } } } }, scales: { y: { title: { display: true, text: 'Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, y1: { position: 'right', title: { display: true, text: 'Hours Worked' }, grid: { drawOnChartArea: false } }, x: { title: { display: true, text: 'Date' }, ticks: { maxRotation: 45, minRotation: 45 } } } }
     });
     const avgProductivity = (productivityData.reduce((a,b) => a+b, 0) / productivityData.length).toFixed(1);
     const trend = productivityData[productivityData.length-1] - productivityData[0];
@@ -581,6 +826,57 @@ function loadCorrelationChart() {
     document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> ${correlationText} ${direction} correlation (r = ${correlation.toFixed(2)}) between hours worked and productivity.<br><br>💡 <strong>Recommendation:</strong> ${recommendation}`;
 }
 
+// New: Load Block Ratings Analysis Chart
+function loadBlockRatingsChart() {
+    const history = getHistory();
+    const ctx = document.getElementById('blockRatingsChart').getContext('2d');
+    if (history.length === 0 || !history.some(h => h.blockRatingsData && Object.keys(h.blockRatingsData).length > 0)) {
+        document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available. Start rating your blocks to see analysis!';
+        if (blockRatingsChart) blockRatingsChart.destroy();
+        return;
+    }
+    
+    // Aggregate ratings by block position
+    const blockRatingsAggregate = {};
+    history.forEach(entry => {
+        if (entry.blockRatingsData) {
+            Object.entries(entry.blockRatingsData).forEach(([blockIdx, rating]) => {
+                if (!blockRatingsAggregate[blockIdx]) {
+                    blockRatingsAggregate[blockIdx] = { sum: 0, count: 0, ratings: [] };
+                }
+                blockRatingsAggregate[blockIdx].sum += rating;
+                blockRatingsAggregate[blockIdx].count++;
+                blockRatingsAggregate[blockIdx].ratings.push(rating);
+            });
+        }
+    });
+    
+    const blockLabels = Object.keys(blockRatingsAggregate).sort((a,b) => a - b).map(idx => `Block ${parseInt(idx) + 1}`);
+    const avgRatings = Object.keys(blockRatingsAggregate).sort((a,b) => a - b).map(idx => (blockRatingsAggregate[idx].sum / blockRatingsAggregate[idx].count).toFixed(1));
+    const minRatings = Object.keys(blockRatingsAggregate).sort((a,b) => a - b).map(idx => Math.min(...blockRatingsAggregate[idx].ratings));
+    const maxRatings = Object.keys(blockRatingsAggregate).sort((a,b) => a - b).map(idx => Math.max(...blockRatingsAggregate[idx].ratings));
+    
+    if (blockRatingsChart) blockRatingsChart.destroy();
+    blockRatingsChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: blockLabels, datasets: [
+            { label: 'Average Rating', data: avgRatings, backgroundColor: '#1B4D3E', borderRadius: 8, yAxisID: 'y' },
+            { label: 'Minimum Rating', data: minRatings, backgroundColor: '#EF4444', borderRadius: 8, yAxisID: 'y' },
+            { label: 'Maximum Rating', data: maxRatings, backgroundColor: '#10B981', borderRadius: 8, yAxisID: 'y' }
+        ] },
+        options: { responsive: true, maintainAspectRatio: true, scales: { y: { title: { display: true, text: 'Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, x: { title: { display: true, text: 'Work Blocks' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}/10` } } } }
+    });
+    
+    // Find hardest and easiest blocks
+    const hardestBlock = avgRatings.reduce((minIdx, rating, idx, arr) => rating < arr[minIdx] ? idx : minIdx, 0);
+    const easiestBlock = avgRatings.reduce((maxIdx, rating, idx, arr) => rating > arr[maxIdx] ? idx : maxIdx, 0);
+    
+    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Difficulty Analysis:</strong><br>
+    • <strong>Most Challenging Block:</strong> ${blockLabels[hardestBlock]} (Avg: ${avgRatings[hardestBlock]}/10)<br>
+    • <strong>Easiest Block:</strong> ${blockLabels[easiestBlock]} (Avg: ${avgRatings[easiestBlock]}/10)<br>
+    • <strong>Insight:</strong> ${avgRatings[hardestBlock] < 5 ? 'Consider breaking down challenging blocks into smaller tasks.' : avgRatings[hardestBlock] > 8 ? 'You\'re handling difficult tasks well!' : 'Maintain balanced workload across all blocks.'}`;
+}
+
 // ============================================
 // NOTIFICATIONS & REMINDERS
 // ============================================
@@ -624,4 +920,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (Notification.permission === "granted") { notificationPermissionGranted = true; setupReminderSystem(); }
     window.renderBlockAssignmentUI = renderBlockAssignmentUI;
     window.finalizeBlockAssignments = finalizeBlockAssignments;
+    window.resetAllBlockAssignments = resetAllBlockAssignments;
+    window.showAllRatingsModal = showAllRatingsModal;
 });
