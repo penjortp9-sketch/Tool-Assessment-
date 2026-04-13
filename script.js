@@ -210,15 +210,15 @@ function showRatingModal(blockIdx) {
                 <h3 style="margin-bottom: 15px; color: var(--primary);">⭐ Rate ${escapeHtml(blockName)}</h3>
                 <p style="margin-bottom: 20px; color: var(--text-muted);">Task: <strong>${escapeHtml(assignedTask)}</strong></p>
                 <div style="margin-bottom: 25px;">
-                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Difficulty/Importance (1-10):</label>
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Productivity (1-10):</label>
                     <input type="range" id="block-rating-slider" min="1" max="10" value="${currentRating || 5}" style="width: 100%; margin: 10px 0;">
                     <div style="text-align: center; font-size: 1.5rem; font-weight: bold; color: var(--primary);">
                         <span id="rating-value-display">${currentRating || 5}</span>/10
                     </div>
                     <div style="display: flex; gap: 8px; margin-top: 10px; justify-content: center; font-size: 0.85rem;">
-                        <span>😴 Easy</span>
+                        <span>📉 Low</span>
                         <span style="flex:1; text-align: center;">⚖️ Medium</span>
-                        <span>🔥 Challenging</span>
+                        <span>📈 High</span>
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
@@ -871,10 +871,10 @@ function loadBlockRatingsChart() {
     const hardestBlock = avgRatings.reduce((minIdx, rating, idx, arr) => rating < arr[minIdx] ? idx : minIdx, 0);
     const easiestBlock = avgRatings.reduce((maxIdx, rating, idx, arr) => rating > arr[maxIdx] ? idx : maxIdx, 0);
     
-    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Difficulty Analysis:</strong><br>
-    • <strong>Most Challenging Block:</strong> ${blockLabels[hardestBlock]} (Avg: ${avgRatings[hardestBlock]}/10)<br>
-    • <strong>Easiest Block:</strong> ${blockLabels[easiestBlock]} (Avg: ${avgRatings[easiestBlock]}/10)<br>
-    • <strong>Insight:</strong> ${avgRatings[hardestBlock] < 5 ? 'Consider breaking down challenging blocks into smaller tasks.' : avgRatings[hardestBlock] > 8 ? 'You\'re handling difficult tasks well!' : 'Maintain balanced workload across all blocks.'}`;
+    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Productivity Analysis:</strong><br>
+    • <strong>Lowest Productivity Block:</strong> ${blockLabels[hardestBlock]} (Avg: ${avgRatings[hardestBlock]}/10)<br>
+    • <strong>Highest Productivity Block:</strong> ${blockLabels[easiestBlock]} (Avg: ${avgRatings[easiestBlock]}/10)<br>
+    • <strong>Insight:</strong> ${avgRatings[hardestBlock] < 5 ? 'Consider optimizing your workflow in low-productivity blocks.' : avgRatings[hardestBlock] > 8 ? 'Excellent! You\'re maintaining high productivity across blocks!' : 'Work on balancing productivity levels across all blocks.'}`;
 }
 
 // ============================================
