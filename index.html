@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Productive Self-Assessment Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Chimla Tabdew | Productivity Self-Assessment</title>
+    <!-- Google Fonts & External Stylesheets -->
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,22 +18,18 @@
                     <h1 class="logo-title">Chimla Tabdew</h1>
                     <p class="logo-subtitle">Personal Productivity Companion</p>
                 </div>
-                
                 <div class="login-form-wrapper">
                     <p class="welcome-text">Welcome back, Smart Worker! 🌿</p>
-                    
                     <div class="form-group">
                         <label class="form-label">Your Name</label>
                         <input type="text" id="username" placeholder="Enter your name" value="Penjor" class="form-input" required>
                     </div>
-                    
                     <div class="form-group">
                         <button type="button" onclick="requestNotificationPermission()" class="btn btn-secondary" style="width: 100%;">
                             🔔 Enable Daily Reminders
                         </button>
                         <p class="notification-hint">Get notified to log your daily productivity</p>
                     </div>
-                    
                     <button onclick="login()" class="btn btn-primary">Enter Workspace</button>
                 </div>
             </div>
@@ -47,14 +44,11 @@
                         <p class="location-date">THIMPHU • BHUTAN • <span id="current-date"></span></p>
                     </div>
                     <div class="header-buttons">
-                        <button id="theme-toggle-btn" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">
-                            🌙 Dark Mode
-                        </button>
+                        <button id="theme-toggle-btn" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
                         <button onclick="showHistoryScreen()" class="btn btn-secondary">📊 History</button>
                         <button onclick="logout()" class="btn btn-secondary">Logout</button>
                     </div>
                 </div>
-                
                 <div id="quote-container" class="quote-card">
                     <p id="daily-quote">"Loading inspiration..."</p>
                 </div>
@@ -67,22 +61,13 @@
                     <button onclick="toggleReminderSettings()" class="btn-icon-small">⚙️</button>
                 </div>
                 <div class="reminder-controls">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="daily-reminder-toggle" onchange="toggleDailyReminder()">
-                        <span>Daily reminder to log entry</span>
-                    </label>
+                    <label class="checkbox-label"><input type="checkbox" id="daily-reminder-toggle" onchange="toggleDailyReminder()"><span>Daily reminder to log entry</span></label>
                     <div class="reminder-time-select" id="reminder-time-group" style="display: none;">
                         <label>Reminder time:</label>
                         <input type="time" id="reminder-time" value="20:00" onchange="saveReminderTime()">
                     </div>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="weekly-report-toggle" onchange="toggleWeeklyReport()">
-                        <span>Weekly summary report (Sundays)</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="nudge-toggle" onchange="toggleNudge()">
-                        <span>Gentle nudge if I miss logging (3 days)</span>
-                    </label>
+                    <label class="checkbox-label"><input type="checkbox" id="weekly-report-toggle" onchange="toggleWeeklyReport()"><span>Weekly summary report (Sundays)</span></label>
+                    <label class="checkbox-label"><input type="checkbox" id="nudge-toggle" onchange="toggleNudge()"><span>Gentle nudge if I miss logging (3 days)</span></label>
                 </div>
             </div>
 
@@ -95,18 +80,9 @@
                 <div class="form-section">
                     <label class="form-label">How are you feeling today?</label>
                     <div class="mood-container">
-                        <button type="button" class="mood-btn" data-mood="🔥" onclick="setMood('🔥', this)">
-                            <span class="mood-emoji">🔥</span>
-                            <span class="mood-text">Focused</span>
-                        </button>
-                        <button type="button" class="mood-btn" data-mood="😊" onclick="setMood('😊', this)">
-                            <span class="mood-emoji">😊</span>
-                            <span class="mood-text">Happy</span>
-                        </button>
-                        <button type="button" class="mood-btn" data-mood="😴" onclick="setMood('😴', this)">
-                            <span class="mood-emoji">😴</span>
-                            <span class="mood-text">Tired</span>
-                        </button>
+                        <button type="button" class="mood-btn" data-mood="🔥" onclick="setMood('🔥', this)"><span class="mood-emoji">🔥</span><span class="mood-text">Focused</span></button>
+                        <button type="button" class="mood-btn" data-mood="😊" onclick="setMood('😊', this)"><span class="mood-emoji">😊</span><span class="mood-text">Happy</span></button>
+                        <button type="button" class="mood-btn" data-mood="😴" onclick="setMood('😴', this)"><span class="mood-emoji">😴</span><span class="mood-text">Tired</span></button>
                     </div>
                     <input type="hidden" id="selected-mood" value="😊">
                 </div>
@@ -139,6 +115,17 @@
                     </div>
                 </div>
 
+                <!-- ========= NEW SECTION: Block Task Assignment BEFORE rating ========= -->
+                <div id="blockAssignmentSection" class="form-section block-assignment-section" style="border-left: 4px solid var(--primary); background: rgba(27,77,62,0.03); padding: 16px; border-radius: 16px; margin-bottom: 28px;">
+                    <label class="form-label" style="font-size: 1.1rem;">🎯 Which task will you work on in each block?</label>
+                    <div id="blockAssignmentContainer" class="block-assignment-container"></div>
+                    <div class="assignment-actions" style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+                        <button type="button" id="finalizeBlockTasksBtn" class="btn btn-primary" style="background: var(--accent);">✅ Mark Block Tasks as Finished</button>
+                        <span id="assignmentStatusMsg" style="font-size: 0.8rem; align-self: center; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+                <!-- ========= END NEW SECTION ========= -->
+
                 <div class="form-section">
                     <label class="form-label">Rate your expected productivity</label>
                     <div class="rating-wrapper">
@@ -152,37 +139,20 @@
                     <textarea id="comments" class="form-input form-textarea" rows="4" placeholder="What went well? Any distractions?"></textarea>
                 </div>
 
-                <button type="button" onclick="saveEntry()" class="btn btn-primary btn-large">Save Today's Entry</button>
+                <button type="button" onclick="saveEntry()" class="btn btn-primary btn-large" id="saveEntryBtn">Save Today's Entry</button>
             </form>
 
             <div id="summary" class="summary-card hidden">
                 <h3 class="section-title">Today's Plan Summary</h3>
                 <div class="summary-grid">
-                    <div class="summary-item">
-                        <span class="summary-label">Tasks</span>
-                        <p id="sum-tasks" class="summary-value"></p>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Work Duration</span>
-                        <p id="sum-hours" class="summary-value"></p>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Blocks</span>
-                        <p class="summary-value"><span id="sum-blocks"></span> × <span id="sum-per-block"></span>h</p>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Productivity Goal</span>
-                        <p id="sum-rating" class="summary-value"></p>
-                    </div>
+                    <div class="summary-item"><span class="summary-label">Tasks</span><p id="sum-tasks" class="summary-value"></p></div>
+                    <div class="summary-item"><span class="summary-label">Work Duration</span><p id="sum-hours" class="summary-value"></p></div>
+                    <div class="summary-item"><span class="summary-label">Blocks</span><p class="summary-value"><span id="sum-blocks"></span> × <span id="sum-per-block"></span>h</p></div>
+                    <div class="summary-item"><span class="summary-label">Productivity Goal</span><p id="sum-rating" class="summary-value"></p></div>
                 </div>
-                <div class="summary-blocks">
-                    <span class="summary-label">Block Schedule</span>
-                    <p id="sum-block-tasks" class="summary-value"></p>
-                </div>
-                <div class="summary-blocks">
-                    <span class="summary-label">Notes</span>
-                    <p id="sum-comments" class="summary-value"></p>
-                </div>
+                <div class="summary-blocks"><span class="summary-label">Block Schedule</span><p id="sum-block-tasks" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Block Task Assignment</span><p id="sum-block-assignment" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Notes</span><p id="sum-comments" class="summary-value"></p></div>
             </div>
 
             <div class="reflection-card">
@@ -195,119 +165,27 @@
         <div id="history-screen" class="screen history-screen hidden">
             <header class="dashboard-header">
                 <div class="header-content">
-                    <div>
-                        <h2 class="greeting">📊 Your Results History</h2>
-                        <p class="location-date">Track your productivity journey</p>
-                    </div>
+                    <div><h2 class="greeting">📊 Your Results History</h2><p class="location-date">Track your productivity journey</p></div>
                     <div class="header-buttons">
-                        <button id="history-theme-toggle" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">
-                            🌙 Dark Mode
-                        </button>
+                        <button id="history-theme-toggle" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
                         <button onclick="clearAllHistory()" class="btn btn-secondary btn-danger">🗑️ Clear All</button>
                         <button onclick="backToDashboard()" class="btn btn-secondary">← Back</button>
                     </div>
                 </div>
             </header>
-
             <div class="history-container">
-                <div class="stats-summary">
-                    <h3 class="section-title">Your Statistics</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">📋</div>
-                            <div class="stat-content">
-                                <span class="stat-label">Total<br>Entries</span>
-                                <span class="stat-number" id="stat-entries">0</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">⭐</div>
-                            <div class="stat-content">
-                                <span class="stat-label">Avg<br>Productivity</span>
-                                <span class="stat-number" id="stat-avg-productivity">0</span><span class="stat-unit">/10</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">⏱️</div>
-                            <div class="stat-content">
-                                <span class="stat-label">Avg Work<br>Hours</span>
-                                <span class="stat-number" id="stat-avg-hours">0</span><span class="stat-unit">h</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🔥</div>
-                            <div class="stat-content">
-                                <span class="stat-label">Most<br>Common<br>Mood</span>
-                                <span class="stat-number" id="stat-mood">-</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="charts-section">
-                    <h3 class="section-title">📊 Analytics Dashboard</h3>
-                    <div class="chart-tabs">
-                        <button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button>
-                        <button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button>
-                        <button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button>
-                        <button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button>
-                    </div>
-                    
-                    <div id="productivity-chart-container" class="chart-container active">
-                        <canvas id="productivityTrendChart"></canvas>
-                        <div class="chart-insight" id="trend-insight"></div>
-                    </div>
-                    
-                    <div id="mood-chart-container" class="chart-container">
-                        <canvas id="moodDistributionChart"></canvas>
-                        <div class="chart-insight" id="mood-insight"></div>
-                    </div>
-                    
-                    <div id="heatmap-chart-container" class="chart-container">
-                        <div id="heatmap-calendar" class="heatmap-calendar"></div>
-                        <div class="chart-insight" id="heatmap-insight"></div>
-                    </div>
-                    
-                    <div id="correlation-chart-container" class="chart-container">
-                        <canvas id="correlationChart"></canvas>
-                        <div class="chart-insight" id="correlation-insight"></div>
-                    </div>
-                </div>
-
-                <div class="filter-section">
-                    <h3 class="section-title">Filter Results</h3>
-                    <div class="filter-controls">
-                        <select id="mood-filter" class="filter-input" onchange="filterHistory()">
-                            <option value="">All Moods</option>
-                            <option value="🔥">🔥 Focused</option>
-                            <option value="😊">😊 Happy</option>
-                            <option value="😴">😴 Tired</option>
-                        </select>
-                        <select id="productivity-filter" class="filter-input" onchange="filterHistory()">
-                            <option value="">All Productivity Levels</option>
-                            <option value="high">High (8-10)</option>
-                            <option value="medium">Medium (5-7)</option>
-                            <option value="low">Low (1-4)</option>
-                        </select>
-                        <button onclick="resetFilters()" class="btn btn-secondary">Reset Filters</button>
-                    </div>
-                </div>
-
-                <div class="history-list-container">
-                    <h3 class="section-title">Entries</h3>
-                    <div id="history-list" class="history-list"></div>
-                </div>
+                <div class="stats-summary"><h3 class="section-title">Your Statistics</h3><div class="stats-grid" id="statsGrid"></div></div>
+                <div class="charts-section"><h3 class="section-title">📊 Analytics Dashboard</h3><div class="chart-tabs"><button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button><button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button><button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button><button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button></div>
+                <div id="productivity-chart-container" class="chart-container active"><canvas id="productivityTrendChart"></canvas><div class="chart-insight" id="trend-insight"></div></div>
+                <div id="mood-chart-container" class="chart-container"><canvas id="moodDistributionChart"></canvas><div class="chart-insight" id="mood-insight"></div></div>
+                <div id="heatmap-chart-container" class="chart-container"><div id="heatmap-calendar" class="heatmap-calendar"></div><div class="chart-insight" id="heatmap-insight"></div></div>
+                <div id="correlation-chart-container" class="chart-container"><canvas id="correlationChart"></canvas><div class="chart-insight" id="correlation-insight"></div></div></div>
+                <div class="filter-section"><h3 class="section-title">Filter Results</h3><div class="filter-controls"><select id="mood-filter" class="filter-input" onchange="filterHistory()"><option value="">All Moods</option><option value="🔥">🔥 Focused</option><option value="😊">😊 Happy</option><option value="😴">😴 Tired</option></select><select id="productivity-filter" class="filter-input" onchange="filterHistory()"><option value="">All Productivity Levels</option><option value="high">High (8-10)</option><option value="medium">Medium (5-7)</option><option value="low">Low (1-4)</option></select><button onclick="resetFilters()" class="btn btn-secondary">Reset Filters</button></div></div>
+                <div class="history-list-container"><h3 class="section-title">Entries</h3><div id="history-list" class="history-list"></div></div>
             </div>
         </div>
     </div>
-
-    <div id="detail-modal" class="modal hidden">
-        <div class="modal-content">
-            <button onclick="closeDetailModal()" class="modal-close">×</button>
-            <div id="detail-content" class="detail-content"></div>
-        </div>
-    </div>
-
+    <div id="detail-modal" class="modal hidden"><div class="modal-content"><button onclick="closeDetailModal()" class="modal-close">×</button><div id="detail-content" class="detail-content"></div></div></div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="script.js"></script>
 </body>
