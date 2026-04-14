@@ -2,6 +2,7 @@
 // COMPLETE JAVASCRIPT - WITH BLOCK RATINGS SYSTEM
 // INCLUDING DARK/LIGHT MODE TOGGLE & BLOCK ASSIGNMENT WITH RATINGS
 // UPDATED: Ratings only available AFTER block completion
+// UPDATED: Auto-generate blocks with editable time per block
 // ============================================
 
 // State Management
@@ -18,7 +19,7 @@ let reminderCheckInterval = null;
 // Block Assignment & Rating Storage
 let blockAssignmentMap = {};
 let blockRatingMap = {};
-let blockCompletionStatus = {}; // NEW: Track which blocks are completed
+let blockCompletionStatus = {}; 
 let blockAssignmentFinished = false;
 
 // ============================================
@@ -129,16 +130,80 @@ function removeTask(index) {
     document.getElementById('assignmentStatusMsg').innerHTML = '';
 }
 
-// Get block name by index
+// Get block name by index (removes time part for display)
 function getBlockNameByIndex(idx) {
     const blockTasksRaw = document.getElementById('block-tasks').value;
     if (!blockTasksRaw) return `Block ${idx+1}`;
     const parts = blockTasksRaw.split(',').map(s => s.trim());
-    if (parts[idx]) return parts[idx];
+    if (parts[idx]) {
+        return parts[idx].replace(/\s*\([\d.]+\s*h?\)/, '').trim();
+    }
     return `Block ${idx+1}`;
 }
 
-// NEW: Mark block as completed
+// ============================================
+// IMPROVED AUTO GENERATE BLOCKS WITH EDITABLE TIME  ← NEW FEATURE
+// ============================================
+
+function autoGenerateBlocksManual() {
+    const totalHours = parseFloat(document.getElementById("total-hours").value) || 6;
+    const blocksCount = parseInt(document.getElementById("blocks").value) || 3;
+   
+    if (blocksCount <= 0 || totalHours <= 0) {
+        showAlert("Please enter valid number of blocks and hours", "error");
+        return;
+    }
+    
+    const hoursPerBlock = (totalHours / blocksCount).toFixed(1);
+    let blockLabels = [];
+    for (let i = 1; i <= blocksCount; i++) {
+        blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
+    }
+    
+    const blockTasksInput = document.getElementById("block-tasks");
+    blockTasksInput.value = blockLabels.join(", ");
+   
+    blockTasksInput.style.borderColor = '#10B981';
+    setTimeout(() => blockTasksInput.style.borderColor = '', 1500);
+
+    // Reset previous block data
+    blockAssignmentMap = {};
+    blockRatingMap = {};
+    blockCompletionStatus = {};
+    blockAssignmentFinished = false;
+    document.getElementById('assignmentStatusMsg').innerHTML = '';
+    renderBlockAssignmentUI();
+}
+
+// NEW: Allow manual editing of time in block input and normalize
+function parseAndUpdateBlockTimes() {
+    const blockInput = document.getElementById('block-tasks').value.trim();
+    if (!blockInput) return;
+
+    const blockParts = blockInput.split(',').map(s => s.trim());
+    let updatedBlocks = [];
+
+    blockParts.forEach((part, index) => {
+        const timeMatch = part.match(/\(([\d.]+)h?\)/);
+        let time = timeMatch ? parseFloat(timeMatch[1]) : null;
+
+        if (time === null || isNaN(time)) {
+            const totalHours = parseFloat(document.getElementById("total-hours").value) || 6;
+            const blocksCount = parseInt(document.getElementById("blocks").value) || blockParts.length;
+            time = parseFloat((totalHours / blocksCount).toFixed(1));
+        }
+
+        const blockName = part.replace(/\s*\([\d.]+\s*h?\)/, '').trim() || `Block ${index + 1}`;
+        updatedBlocks.push(`${blockName} (${time}h)`);
+    });
+
+    document.getElementById('block-tasks').value = updatedBlocks.join(", ");
+}
+
+// ============================================
+// BLOCK ASSIGNMENT & RATING SYSTEM (Unchanged)
+// ============================================
+
 function markBlockCompleted(blockIdx) {
     const assignedTask = blockAssignmentMap[blockIdx] || '';
     
@@ -147,13 +212,11 @@ function markBlockCompleted(blockIdx) {
         return;
     }
     
-    // Toggle completion status
     blockCompletionStatus[blockIdx] = !blockCompletionStatus[blockIdx];
     
     if (blockCompletionStatus[blockIdx]) {
         showAlert(`✅ Block ${blockIdx + 1} marked as completed! You can now rate it.`, "success");
     } else {
-        // If uncompleting, also remove the rating
         delete blockRatingMap[blockIdx];
         showAlert(`⏳ Block ${blockIdx + 1} marked as incomplete. Rating cleared.`, "warning");
     }
@@ -162,7 +225,6 @@ function markBlockCompleted(blockIdx) {
     updateRatingSummary();
 }
 
-// Render Block Assignment UI with Rating Buttons (UPDATED)
 function renderBlockAssignmentUI() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const container = document.getElementById('blockAssignmentContainer');
@@ -207,7 +269,6 @@ function renderBlockAssignmentUI() {
             else delete blockAssignmentMap[blockIdx];
             blockAssignmentFinished = false;
             document.getElementById('assignmentStatusMsg').innerHTML = '';
-            // Clear completion and rating if task changed
             blockCompletionStatus[blockIdx] = false;
             delete blockRatingMap[blockIdx];
             updateRatingSummary();
@@ -238,7 +299,6 @@ function renderBlockAssignmentUI() {
     updateRatingSummary();
 }
 
-// Show rating modal for individual block (UPDATED)
 function showRatingModal(blockIdx) {
     const blockName = getBlockNameByIndex(blockIdx);
     const currentRating = blockRatingMap[blockIdx] || '';
@@ -254,7 +314,6 @@ function showRatingModal(blockIdx) {
         return;
     }
     
-    // Create modal for rating
     const modalHtml = `
         <div id="rating-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);">
             <div style="background: var(--card-bg); padding: 30px; border-radius: 20px; max-width: 400px; width: 90%; animation: slideInUp 0.3s ease-out;">
@@ -292,7 +351,6 @@ function showRatingModal(blockIdx) {
     }
 }
 
-// Save rating for a block
 function saveBlockRating(blockIdx) {
     const slider = document.getElementById('block-rating-slider');
     if (slider) {
@@ -304,13 +362,11 @@ function saveBlockRating(blockIdx) {
     }
 }
 
-// Close rating modal
 function closeRatingModal() {
     const existingModal = document.getElementById('rating-modal-overlay');
     if (existingModal) existingModal.remove();
 }
 
-// Update rating summary display
 function updateRatingSummary() {
     const summaryDiv = document.getElementById('blockRatingSummary');
     const summaryText = document.getElementById('ratingsSummaryText');
@@ -331,7 +387,6 @@ function updateRatingSummary() {
     }
 }
 
-// Show all ratings in a modal
 function showAllRatingsModal() {
     let ratingsHtml = '<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">⭐ Block Ratings Summary</h3>';
     for (let i = 0; i < Object.keys(blockAssignmentMap).length; i++) {
@@ -369,7 +424,6 @@ function closeRatingsModal() {
     if (existingModal) existingModal.remove();
 }
 
-// Reset all block assignments and ratings
 function resetAllBlockAssignments() {
     if (confirm('Are you sure you want to reset all block assignments and ratings?')) {
         blockAssignmentMap = {};
@@ -382,26 +436,6 @@ function resetAllBlockAssignments() {
     }
 }
 
-// Auto generate blocks
-function autoGenerateBlocksManual() {
-    const total = parseFloat(document.getElementById("total-hours").value) || 0;
-    const blocks = parseInt(document.getElementById("blocks").value) || 1;
-    const hoursPerBlock = (total / blocks).toFixed(1);
-    let blockLabels = [];
-    for (let i = 1; i <= blocks; i++) blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
-    const blockTasksInput = document.getElementById("block-tasks");
-    blockTasksInput.value = blockLabels.join(", ");
-    blockTasksInput.style.borderColor = '#10B981';
-    setTimeout(() => blockTasksInput.style.borderColor = '', 2000);
-    blockAssignmentMap = {};
-    blockRatingMap = {};
-    blockCompletionStatus = {};
-    blockAssignmentFinished = false;
-    document.getElementById('assignmentStatusMsg').innerHTML = '';
-    renderBlockAssignmentUI();
-}
-
-// Finalize block assignments with rating validation
 function finalizeBlockAssignments() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const missingBlocks = [];
@@ -470,12 +504,20 @@ function logout() {
     blockAssignmentFinished = false;
 }
 
-// Setup event listeners for block count and hours
+// Setup event listeners for block count and hours + NEW editable time
 function setupEventListeners() {
     const blocksInput = document.getElementById('blocks');
     const hoursInput = document.getElementById('total-hours');
-    if (blocksInput) blocksInput.addEventListener('change', renderBlockAssignmentUI);
+    const blockTasksInput = document.getElementById('block-tasks');
+
+    if (blocksInput) blocksInput.addEventListener('change', autoGenerateBlocksManual);
     if (hoursInput) hoursInput.addEventListener('change', autoGenerateBlocksManual);
+    
+    // NEW: Listen to manual edits in block time
+    if (blockTasksInput) {
+        blockTasksInput.addEventListener('change', parseAndUpdateBlockTimes);
+        blockTasksInput.addEventListener('blur', parseAndUpdateBlockTimes);
+    }
 }
 
 // Alert system
@@ -937,4 +979,5 @@ document.addEventListener('DOMContentLoaded', function() {
     window.finalizeBlockAssignments = finalizeBlockAssignments;
     window.resetAllBlockAssignments = resetAllBlockAssignments;
     window.showAllRatingsModal = showAllRatingsModal;
+    window.parseAndUpdateBlockTimes = parseAndUpdateBlockTimes;   // ← New function exposed
 });
