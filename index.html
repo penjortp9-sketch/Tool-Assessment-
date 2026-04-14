@@ -1,3 +1,4 @@
+<!-- new.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -115,12 +116,11 @@
                     </div>
                 </div>
 
-                <!-- MULTI-TASK BLOCK ASSIGNMENT SECTION - Each block can have multiple tasks -->
+                <!-- MULTI-TASK BLOCK ASSIGNMENT SECTION -->
                 <div id="blockAssignmentSection" class="form-section block-assignment-section" style="border-left: 4px solid var(--primary); background: rgba(27,77,62,0.03); padding: 16px; border-radius: 16px; margin-bottom: 28px;">
                     <label class="form-label" style="font-size: 1.1rem;">🎯 Assign multiple tasks to each block (select & add tasks)</label>
                     <div id="blockAssignmentContainer" class="block-assignment-container"></div>
                     
-                    <!-- Block Rating Summary -->
                     <div id="blockRatingSummary" class="block-rating-summary" style="margin-top: 15px; padding: 12px; background: var(--bg-light); border-radius: 12px; display: none;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-weight: 600;">⭐ Block Ratings Summary</span>
@@ -133,6 +133,23 @@
                         <button type="button" id="finalizeBlockTasksBtn" class="btn btn-primary" style="background: var(--accent);">✅ Mark Block Tasks as Finished</button>
                         <button type="button" onclick="resetAllBlockAssignments()" class="btn btn-secondary">🔄 Reset All</button>
                         <span id="assignmentStatusMsg" style="font-size: 0.8rem; align-self: center; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+
+                <!-- DISTRACTION TRACKER SECTION -->
+                <div id="distractionTrackerSection" class="form-section distraction-tracker-section" style="border-left: 4px solid #F59E0B; background: rgba(245,158,11,0.08); padding: 16px; border-radius: 16px; margin-bottom: 28px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 1.1rem; margin-bottom: 0;">🚫 Distraction Tracker</label>
+                        <button type="button" onclick="showDistractionInsightsModal()" class="btn-icon-small" style="font-size: 0.8rem; background: rgba(245,158,11,0.2); padding: 6px 12px; border-radius: 20px;">📊 View Insights</button>
+                    </div>
+                    <div id="distractionBlocksContainer" style="min-height: 100px;"></div>
+                    
+                    <div id="distractionPatternsCard" style="margin-top: 16px; padding: 12px; background: var(--bg-light); border-radius: 12px; display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;">📊 Your Distraction Patterns</span>
+                        </div>
+                        <div id="distractionPatternsText" style="font-size: 0.85rem; margin-top: 8px; color: var(--text-muted);"></div>
+                        <div id="distractionSuggestionsText" style="font-size: 0.85rem; margin-top: 8px; color: #F59E0B;"></div>
                     </div>
                 </div>
 
@@ -165,6 +182,7 @@
                 </div>
                 <div class="summary-blocks"><span class="summary-label">Block Schedule</span><p id="sum-block-tasks" class="summary-value"></p></div>
                 <div class="summary-blocks"><span class="summary-label">Block Task Assignment & Ratings</span><p id="sum-block-assignment" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Distractions Logged</span><p id="sum-distractions" class="summary-value"></p></div>
                 <div class="summary-blocks"><span class="summary-label">Notes</span><p id="sum-comments" class="summary-value"></p></div>
             </div>
 
@@ -188,12 +206,13 @@
             </header>
             <div class="history-container">
                 <div class="stats-summary"><h3 class="section-title">Your Statistics</h3><div class="stats-grid" id="statsGrid"></div></div>
-                <div class="charts-section"><h3 class="section-title">📊 Analytics Dashboard</h3><div class="chart-tabs"><button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button><button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button><button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button><button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button><button class="chart-tab" onclick="switchChartTab('blockratings', event)">⭐ Block Ratings Analysis</button></div>
+                <div class="charts-section"><h3 class="section-title">📊 Analytics Dashboard</h3><div class="chart-tabs"><button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button><button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button><button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button><button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button><button class="chart-tab" onclick="switchChartTab('blockratings', event)">⭐ Block Ratings</button><button class="chart-tab" onclick="switchChartTab('distractions', event)">🚫 Distractions</button></div>
                 <div id="productivity-chart-container" class="chart-container active"><canvas id="productivityTrendChart"></canvas><div class="chart-insight" id="trend-insight"></div></div>
                 <div id="mood-chart-container" class="chart-container"><canvas id="moodDistributionChart"></canvas><div class="chart-insight" id="mood-insight"></div></div>
                 <div id="heatmap-chart-container" class="chart-container"><div id="heatmap-calendar" class="heatmap-calendar"></div><div class="chart-insight" id="heatmap-insight"></div></div>
                 <div id="correlation-chart-container" class="chart-container"><canvas id="correlationChart"></canvas><div class="chart-insight" id="correlation-insight"></div></div>
-                <div id="blockratings-chart-container" class="chart-container"><canvas id="blockRatingsChart"></canvas><div class="chart-insight" id="blockratings-insight"></div></div></div>
+                <div id="blockratings-chart-container" class="chart-container"><canvas id="blockRatingsChart"></canvas><div class="chart-insight" id="blockratings-insight"></div></div>
+                <div id="distractions-chart-container" class="chart-container"><canvas id="distractionChart"></canvas><div class="chart-insight" id="distraction-insight"></div></div></div>
                 <div class="filter-section"><h3 class="section-title">Filter Results</h3><div class="filter-controls"><select id="mood-filter" class="filter-input" onchange="filterHistory()"><option value="">All Moods</option><option value="🔥">🔥 Focused</option><option value="😊">😊 Happy</option><option value="😴">😴 Tired</option></select><select id="productivity-filter" class="filter-input" onchange="filterHistory()"><option value="">All Productivity Levels</option><option value="high">High (8-10)</option><option value="medium">Medium (5-7)</option><option value="low">Low (1-4)</option></select><button onclick="resetFilters()" class="btn btn-secondary">Reset Filters</button></div></div>
                 <div class="history-list-container"><h3 class="section-title">Entries</h3><div id="history-list" class="history-list"></div></div>
             </div>

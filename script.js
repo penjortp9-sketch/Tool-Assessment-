@@ -1,6 +1,6 @@
+// script.js
 // ============================================
 // CHIMLA TABDEW - MULTI-TASK BLOCK ASSIGNMENT SYSTEM
-// Each block can have MULTIPLE tasks assigned
 // ============================================
 
 // State Management
@@ -11,18 +11,36 @@ let productivityChart = null;
 let moodChart = null;
 let correlationChart = null;
 let blockRatingsChart = null;
+let distractionChart = null;
 let notificationPermissionGranted = false;
 let reminderCheckInterval = null;
 
 // Multi-Task Block Assignment Storage
-// Structure: blockTasksMap[blockIndex] = [{ taskName, rating, completed }]
 let blockTasksMap = {};
-let blockCompletionMap = {};      // { blockIndex: boolean (all tasks completed?) }
-let blockRatingMap = {};           // { blockIndex: averageRating }
+let blockCompletionMap = {};
+let blockRatingMap = {};
 let blockAssignmentFinished = false;
 
+// Distraction Tracker State
+let distractionLogs = {};
+
+// Predefined distraction types
+const distractionTypes = [
+    { value: "📱 Social Media", label: "📱 Social Media" },
+    { value: "📧 Email", label: "📧 Email" },
+    { value: "📞 Phone Calls", label: "📞 Phone Calls" },
+    { value: "💬 Messaging Apps", label: "💬 Messaging Apps" },
+    { value: "🔊 Noise", label: "🔊 Noise" },
+    { value: "💭 Daydreaming", label: "💭 Daydreaming" },
+    { value: "🍽️ Eating/Snacking", label: "🍽️ Eating/Snacking" },
+    { value: "📺 Videos/Streaming", label: "📺 Videos/Streaming" },
+    { value: "🎮 Gaming", label: "🎮 Gaming" },
+    { value: "😴 Fatigue", label: "😴 Fatigue" },
+    { value: "✨ Other", label: "✨ Other" }
+];
+
 // ============================================
-// DARK/LIGHT MODE TOGGLE IMPLEMENTATION
+// DARK/LIGHT MODE TOGGLE
 // ============================================
 
 function applyTheme(theme) {
@@ -91,12 +109,24 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Mood Management
 function setMood(mood, btn) {
     document.getElementById('selected-mood').value = mood;
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     if (navigator.vibrate) navigator.vibrate(50);
+}
+
+function showAlert(msg, type = "info") {
+    const alertDiv = document.createElement('div');
+    alertDiv.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px; padding: 16px 24px; 
+        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#3B82F6'};
+        color: white; border-radius: 12px; z-index: 9999; animation: slideInUp 0.3s ease-out;
+        font-weight: 600; max-width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    `;
+    alertDiv.textContent = msg;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
 }
 
 // ============================================
@@ -106,13 +136,9 @@ function setMood(mood, btn) {
 function calculateAutoProductivityScore() {
     const ratedBlocks = Object.keys(blockRatingMap).filter(idx => blockCompletionMap[idx] === true && blockRatingMap[idx] !== null);
     if (ratedBlocks.length === 0) return null;
-    
     let totalRating = 0;
-    for (let idx of ratedBlocks) {
-        totalRating += blockRatingMap[idx];
-    }
-    const averageRating = totalRating / ratedBlocks.length;
-    return Math.round(averageRating * 10) / 10;
+    for (let idx of ratedBlocks) totalRating += blockRatingMap[idx];
+    return Math.round((totalRating / ratedBlocks.length) * 10) / 10;
 }
 
 function updateAutoProductivityDisplay() {
@@ -120,7 +146,6 @@ function updateAutoProductivityDisplay() {
     const scoreSpan = document.getElementById('auto-productivity-score');
     const breakdownSpan = document.getElementById('score-breakdown');
     const ratedBlocks = Object.keys(blockRatingMap).filter(idx => blockCompletionMap[idx] === true);
-    
     if (score !== null && ratedBlocks.length > 0) {
         scoreSpan.textContent = score.toFixed(1);
         breakdownSpan.innerHTML = `✨ Based on ${ratedBlocks.length} rated block${ratedBlocks.length !== 1 ? 's' : ''} | Average rating: ${score.toFixed(1)}/10`;
@@ -131,84 +156,74 @@ function updateAutoProductivityDisplay() {
 }
 
 // ============================================
-// AUTO GENERATE BLOCKS WITH EDITABLE TIME
+// AUTO GENERATE BLOCKS
 // ============================================
 
 function autoGenerateBlocksManual() {
     const totalHours = parseFloat(document.getElementById("total-hours").value) || 6;
     const blocksCount = parseInt(document.getElementById("blocks").value) || 3;
-   
     if (blocksCount <= 0 || totalHours <= 0) {
         showAlert("Please enter valid number of blocks and hours", "error");
         return;
     }
-    
     const hoursPerBlock = (totalHours / blocksCount).toFixed(1);
     let blockLabels = [];
-    for (let i = 1; i <= blocksCount; i++) {
-        blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
-    }
-    
-    const blockTasksInput = document.getElementById("block-tasks");
-    blockTasksInput.value = blockLabels.join(", ");
-   
-    blockTasksInput.style.borderColor = '#10B981';
-    setTimeout(() => blockTasksInput.style.borderColor = '', 1500);
-
-    // Reset previous block data
+    for (let i = 1; i <= blocksCount; i++) blockLabels.push(`Block ${i} (${hoursPerBlock}h)`);
+    document.getElementById("block-tasks").value = blockLabels.join(", ");
+    document.getElementById("block-tasks").style.borderColor = '#10B981';
+    setTimeout(() => document.getElementById("block-tasks").style.borderColor = '', 1500);
     blockTasksMap = {};
     blockCompletionMap = {};
     blockRatingMap = {};
+    distractionLogs = {};
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     renderBlockAssignmentUI();
+    renderDistractionTrackerUI();
     updateAutoProductivityDisplay();
+    updateDistractionPatterns();
 }
 
 function parseAndUpdateBlockTimes() {
     const blockInput = document.getElementById('block-tasks').value.trim();
     if (!blockInput) return;
-
     const blockParts = blockInput.split(',').map(s => s.trim());
     let updatedBlocks = [];
-
     blockParts.forEach((part, index) => {
         const timeMatch = part.match(/\(([\d.]+)h?\)/);
         let time = timeMatch ? parseFloat(timeMatch[1]) : null;
-
         if (time === null || isNaN(time)) {
             const totalHours = parseFloat(document.getElementById("total-hours").value) || 6;
             const blocksCount = parseInt(document.getElementById("blocks").value) || blockParts.length;
             time = parseFloat((totalHours / blocksCount).toFixed(1));
         }
-
         const blockName = part.replace(/\s*\([\d.]+\s*h?\)/, '').trim() || `Block ${index + 1}`;
         updatedBlocks.push(`${blockName} (${time}h)`);
     });
-
     document.getElementById('block-tasks').value = updatedBlocks.join(", ");
 }
 
+function getBlockNameByIndex(idx) {
+    const blockTasksRaw = document.getElementById('block-tasks').value;
+    if (!blockTasksRaw) return `Block ${idx + 1}`;
+    const parts = blockTasksRaw.split(',').map(s => s.trim());
+    if (parts[idx]) return parts[idx].replace(/\s*\([\d.]+\s*h?\)/, '').trim();
+    return `Block ${idx + 1}`;
+}
+
 // ============================================
-// MULTI-TASK BLOCK ASSIGNMENT & RATING SYSTEM
+// BLOCK ASSIGNMENT & RATING
 // ============================================
 
 function addTaskToBlock(blockIdx) {
     const select = document.getElementById(`block-select-${blockIdx}`);
     if (!select) return;
     const selectedTask = select.value;
-    if (!selectedTask) {
-        showAlert("Please select a task to add", "warning");
-        return;
-    }
-    
+    if (!selectedTask) { showAlert("Please select a task to add", "warning"); return; }
     if (!blockTasksMap[blockIdx]) blockTasksMap[blockIdx] = [];
     blockTasksMap[blockIdx].push({ taskName: selectedTask, rating: null });
-    
-    // Reset completion status because tasks changed
     blockCompletionMap[blockIdx] = false;
     delete blockRatingMap[blockIdx];
-    
     select.value = "";
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
@@ -219,7 +234,6 @@ function removeTaskFromBlock(blockIdx, taskIdx) {
     if (blockTasksMap[blockIdx]) {
         const removedTask = blockTasksMap[blockIdx][taskIdx].taskName;
         blockTasksMap[blockIdx].splice(taskIdx, 1);
-        
         if (blockTasksMap[blockIdx].length === 0) {
             blockCompletionMap[blockIdx] = false;
             delete blockRatingMap[blockIdx];
@@ -239,19 +253,14 @@ function markBlockCompleted(blockIdx) {
         showAlert(`⚠️ Please add at least one task to Block ${blockIdx + 1} before completing.`, "error");
         return;
     }
-    
     blockCompletionMap[blockIdx] = !blockCompletionMap[blockIdx];
-    
     if (!blockCompletionMap[blockIdx]) {
         delete blockRatingMap[blockIdx];
-        if (blockTasksMap[blockIdx]) {
-            blockTasksMap[blockIdx].forEach(t => t.rating = null);
-        }
+        if (blockTasksMap[blockIdx]) blockTasksMap[blockIdx].forEach(t => t.rating = null);
         showAlert(`⏳ Block ${blockIdx + 1} marked as incomplete. Ratings cleared.`, "warning");
     } else {
         showAlert(`✅ Block ${blockIdx + 1} marked as completed! You can now rate each task.`, "success");
     }
-    
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
 }
@@ -261,57 +270,29 @@ function showRatingModalForBlock(blockIdx) {
         showAlert(`⚠️ Please complete Block ${blockIdx + 1} first before rating.`, "error");
         return;
     }
-    
     const tasks = blockTasksMap[blockIdx] || [];
     if (tasks.length === 0) {
         showAlert(`⚠️ No tasks to rate in Block ${blockIdx + 1}.`, "error");
         return;
     }
-    
-    let modalHtml = `
-        <div id="rating-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);">
-            <div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                <h3 style="margin-bottom: 15px; color: var(--primary);">⭐ Rate Tasks in Block ${blockIdx + 1}</h3>
-    `;
-    
+    let modalHtml = `<div id="rating-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);"><div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;"><h3 style="margin-bottom: 15px; color: var(--primary);">⭐ Rate Tasks in Block ${blockIdx + 1}</h3>`;
     tasks.forEach((task, tIdx) => {
         const currentRating = task.rating || 5;
-        modalHtml += `
-            <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                <strong>${escapeHtml(task.taskName)}</strong><br>
-                <input type="range" id="rating-slider-${blockIdx}-${tIdx}" min="1" max="10" value="${currentRating}" style="width: 100%; margin-top: 8px;">
-                <span id="rating-val-${blockIdx}-${tIdx}" style="display: inline-block; margin-top: 4px;">${currentRating}/10</span>
-            </div>
-        `;
+        modalHtml += `<div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;"><strong>${escapeHtml(task.taskName)}</strong><br><input type="range" id="rating-slider-${blockIdx}-${tIdx}" min="1" max="10" value="${currentRating}" style="width: 100%; margin-top: 8px;"><span id="rating-val-${blockIdx}-${tIdx}" style="display: inline-block; margin-top: 4px;">${currentRating}/10</span></div>`;
     });
-    
-    modalHtml += `
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button onclick="saveBlockRatings(${blockIdx})" class="btn btn-primary">Save All Ratings</button>
-                    <button onclick="closeRatingModal()" class="btn btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
+    modalHtml += `<div style="display: flex; gap: 10px; margin-top: 20px;"><button onclick="saveBlockRatings(${blockIdx})" class="btn btn-primary">Save All Ratings</button><button onclick="closeRatingModal()" class="btn btn-secondary">Cancel</button></div></div></div>`;
     closeRatingModal();
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Attach live listeners for sliders
     for (let tIdx = 0; tIdx < tasks.length; tIdx++) {
         const slider = document.getElementById(`rating-slider-${blockIdx}-${tIdx}`);
         const span = document.getElementById(`rating-val-${blockIdx}-${tIdx}`);
-        if (slider && span) {
-            slider.oninput = () => { span.innerText = slider.value + "/10"; };
-        }
+        if (slider && span) slider.oninput = () => { span.innerText = slider.value + "/10"; };
     }
 }
 
 function saveBlockRatings(blockIdx) {
     const tasks = blockTasksMap[blockIdx] || [];
-    let totalRating = 0;
-    let ratedCount = 0;
-    
+    let totalRating = 0, ratedCount = 0;
     for (let tIdx = 0; tIdx < tasks.length; tIdx++) {
         const slider = document.getElementById(`rating-slider-${blockIdx}-${tIdx}`);
         if (slider) {
@@ -321,84 +302,37 @@ function saveBlockRatings(blockIdx) {
             ratedCount++;
         }
     }
-    
-    if (ratedCount > 0) {
-        const avgRating = totalRating / ratedCount;
-        blockRatingMap[blockIdx] = Math.round(avgRating * 10) / 10;
-        showAlert(`✅ Block ${blockIdx + 1} rated! Average: ${blockRatingMap[blockIdx]}/10`, "success");
-    } else {
-        blockRatingMap[blockIdx] = null;
-    }
-    
+    if (ratedCount > 0) blockRatingMap[blockIdx] = Math.round((totalRating / ratedCount) * 10) / 10;
+    else blockRatingMap[blockIdx] = null;
     closeRatingModal();
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
 }
 
-function closeRatingModal() {
-    const existingModal = document.getElementById('rating-modal-overlay');
-    if (existingModal) existingModal.remove();
-}
+function closeRatingModal() { const existingModal = document.getElementById('rating-modal-overlay'); if (existingModal) existingModal.remove(); }
 
 function renderBlockAssignmentUI() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const container = document.getElementById('blockAssignmentContainer');
     if (!container) return;
-    
     if (taskList.length === 0) {
-        container.innerHTML = `<div style="padding: 12px; background: var(--bg-light); border-radius: 12px; color: var(--text-muted);">
-            <span>⚠️ Add at least one task above to assign to blocks.</span>
-        </div>`;
+        container.innerHTML = `<div style="padding: 12px; background: var(--bg-light); border-radius: 12px; color: var(--text-muted);"><span>⚠️ Add at least one task above to assign to blocks.</span></div>`;
         document.getElementById('blockRatingSummary').style.display = 'none';
         return;
     }
-    
     let html = '';
     for (let i = 0; i < blocksCount; i++) {
         const blockName = getBlockNameByIndex(i);
         const tasksInBlock = blockTasksMap[i] || [];
         const isCompleted = blockCompletionMap[i] || false;
         const avgRating = blockRatingMap[i] || null;
-        const completedClass = isCompleted ? 'completed' : '';
-        
-        html += `
-            <div class="block-assign-row" style="border-left: 4px solid ${isCompleted ? '#10B981' : 'var(--primary)'};">
-                <div class="block-header">
-                    <span class="block-name">📌 ${escapeHtml(blockName)}</span>
-                    <button type="button" class="btn-complete-block ${completedClass}" onclick="markBlockCompleted(${i})" style="background: ${isCompleted ? '#10B981' : '#D4A574'};">
-                        ${isCompleted ? '✅ Completed' : '⏳ Mark Block Done'}
-                    </button>
-                </div>
-                
-                <div class="multi-task-container" id="tasks-list-block-${i}">
-                    ${tasksInBlock.map((t, tIdx) => `
-                        <span class="task-tag">
-                            ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝'}
-                            <span class="task-tag-remove" onclick="removeTaskFromBlock(${i}, ${tIdx})">✕</span>
-                        </span>
-                    `).join('')}
-                    ${tasksInBlock.length === 0 ? '<span style="color: var(--text-muted); font-size: 0.8rem;">No tasks added yet</span>' : ''}
-                </div>
-                
-                <div class="add-task-to-block">
-                    <select id="block-select-${i}" class="task-selector">
-                        <option value="">— Add a task —</option>
-                        ${taskList.map(task => `<option value="${escapeHtml(task)}">${escapeHtml(task)}</option>`).join('')}
-                    </select>
-                    <button type="button" class="btn-sm btn-secondary" onclick="addTaskToBlock(${i})">➕ Add Task</button>
-                </div>
-                
-                <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    ${!isCompleted ? 
-                        `<button type="button" class="btn-rate-block" disabled style="opacity: 0.5; cursor: not-allowed;">⭐ Rate Block (complete first)</button>` : 
-                        `<button type="button" class="btn-rate-block" onclick="showRatingModalForBlock(${i})">${avgRating ? `⭐ Rate (${avgRating}/10)` : '⭐ Rate Block'}</button>`
-                    }
-                    ${avgRating ? `<span class="rating-badge ${avgRating >= 8 ? 'rating-high' : avgRating >= 5 ? 'rating-medium' : 'rating-low'}">Avg: ${avgRating}/10</span>` : ''}
-                </div>
-            </div>
-        `;
+        html += `<div class="block-assign-row" style="border-left: 4px solid ${isCompleted ? '#10B981' : 'var(--primary)'};">
+            <div class="block-header"><span class="block-name">📌 ${escapeHtml(blockName)}</span><button type="button" class="btn-complete-block ${isCompleted ? 'completed' : ''}" onclick="markBlockCompleted(${i})" style="background: ${isCompleted ? '#10B981' : '#D4A574'};">${isCompleted ? '✅ Completed' : '⏳ Mark Block Done'}</button></div>
+            <div class="multi-task-container">${tasksInBlock.map((t, tIdx) => `<span class="task-tag">${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝'}<span class="task-tag-remove" onclick="removeTaskFromBlock(${i}, ${tIdx})">✕</span></span>`).join('')}${tasksInBlock.length === 0 ? '<span style="color: var(--text-muted); font-size: 0.8rem;">No tasks added yet</span>' : ''}</div>
+            <div class="add-task-to-block"><select id="block-select-${i}" class="task-selector"><option value="">— Add a task —</option>${taskList.map(task => `<option value="${escapeHtml(task)}">${escapeHtml(task)}</option>`).join('')}</select><button type="button" class="btn-sm btn-secondary" onclick="addTaskToBlock(${i})">➕ Add Task</button></div>
+            <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">${!isCompleted ? `<button type="button" class="btn-rate-block" disabled style="opacity: 0.5; cursor: not-allowed;">⭐ Rate Block (complete first)</button>` : `<button type="button" class="btn-rate-block" onclick="showRatingModalForBlock(${i})">${avgRating ? `⭐ Rate (${avgRating}/10)` : '⭐ Rate Block'}</button>`}${avgRating ? `<span class="rating-badge ${avgRating >= 8 ? 'rating-high' : avgRating >= 5 ? 'rating-medium' : 'rating-low'}">Avg: ${avgRating}/10</span>` : ''}</div>
+        </div>`;
     }
-    
     container.innerHTML = html;
     updateRatingSummary();
     updateAutoProductivityDisplay();
@@ -407,67 +341,38 @@ function renderBlockAssignmentUI() {
 function updateRatingSummary() {
     const summaryDiv = document.getElementById('blockRatingSummary');
     const summaryTextDiv = document.getElementById('ratingsSummaryText');
-    
     if (!summaryDiv) return;
-    
     const ratedBlocks = Object.keys(blockRatingMap).filter(idx => blockRatingMap[idx] !== null);
-    
     if (ratedBlocks.length > 0) {
         summaryDiv.style.display = 'block';
         let summary = '';
-        for (let i = 0; i < ratedBlocks.length; i++) {
-            const idx = ratedBlocks[i];
+        for (let idx of ratedBlocks) {
             const rating = blockRatingMap[idx];
             const ratingClass = rating >= 8 ? 'rating-high' : (rating >= 5 ? 'rating-medium' : 'rating-low');
             summary += `<span class="rating-badge ${ratingClass}" style="margin-right: 8px; margin-bottom: 5px; display: inline-block;">Block ${parseInt(idx) + 1}: ${rating}/10</span>`;
         }
-        summaryTextDiv.innerHTML = summary || 'No ratings yet';
-    } else {
-        summaryDiv.style.display = 'none';
-    }
+        summaryTextDiv.innerHTML = summary;
+    } else summaryDiv.style.display = 'none';
 }
 
 function showAllRatingsModal() {
     let ratingsHtml = '<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">⭐ Block Ratings Summary</h3>';
-    
     for (let i = 0; i < Object.keys(blockTasksMap).length; i++) {
         const tasks = blockTasksMap[i];
         if (tasks && tasks.length > 0) {
             const isCompleted = blockCompletionMap[i] || false;
             const avgRating = blockRatingMap[i] || 'Not rated';
             const ratingClass = (avgRating !== 'Not rated' && avgRating >= 8) ? 'rating-high' : (avgRating !== 'Not rated' && avgRating >= 5) ? 'rating-medium' : 'rating-low';
-            
-            ratingsHtml += `
-                <div style="padding: 12px; margin-bottom: 10px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid ${isCompleted ? '#10B981' : 'var(--primary)'};">
-                    <strong>Block ${i+1}:</strong><br>
-                    ${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝 Not rated'}`).join('<br>')}
-                    <br>
-                    <span style="font-size: 0.85rem; color: var(--text-muted);">${isCompleted ? '✅ Completed' : '⏳ Not completed'}</span><br>
-                    <span class="rating-badge ${ratingClass}" style="margin-top: 5px; display: inline-block;">⭐ ${avgRating === 'Not rated' ? 'Not rated' : avgRating + '/10'}</span>
-                </div>
-            `;
+            ratingsHtml += `<div style="padding: 12px; margin-bottom: 10px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid ${isCompleted ? '#10B981' : 'var(--primary)'};"><strong>Block ${i+1}:</strong><br>${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝 Not rated'}`).join('<br>')}<br><span style="font-size: 0.85rem; color: var(--text-muted);">${isCompleted ? '✅ Completed' : '⏳ Not completed'}</span><br><span class="rating-badge ${ratingClass}" style="margin-top: 5px; display: inline-block;">⭐ ${avgRating === 'Not rated' ? 'Not rated' : avgRating + '/10'}</span></div>`;
         }
     }
-    
-    ratingsHtml += '</div>';
-    
-    const modalHtml = `
-        <div id="ratings-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);">
-            <div style="background: var(--card-bg); padding: 30px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; animation: slideInUp 0.3s ease-out;">
-                ${ratingsHtml}
-                <button onclick="closeRatingsModal()" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Close</button>
-            </div>
-        </div>
-    `;
-    
+    ratingsHtml += '</div><button onclick="closeRatingsModal()" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Close</button>';
+    const modalHtml = `<div id="ratings-modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(4px);"><div style="background: var(--card-bg); padding: 30px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">${ratingsHtml}</div></div>`;
     closeRatingsModal();
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-function closeRatingsModal() {
-    const existingModal = document.getElementById('ratings-modal-overlay');
-    if (existingModal) existingModal.remove();
-}
+function closeRatingsModal() { const existingModal = document.getElementById('ratings-modal-overlay'); if (existingModal) existingModal.remove(); }
 
 function resetAllBlockAssignments() {
     if (confirm('Are you sure you want to reset all block assignments and ratings?')) {
@@ -482,44 +387,129 @@ function resetAllBlockAssignments() {
     }
 }
 
-function finalizeBlockAssignments() {
+// ============================================
+// DISTRACTION TRACKER FUNCTIONS
+// ============================================
+
+function renderDistractionTrackerUI() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
-    const missingBlocks = [];
-    const uncompletedBlocks = [];
-    
+    const container = document.getElementById('distractionBlocksContainer');
+    if (!container) return;
+    if (Object.keys(blockTasksMap).length === 0 && taskList.length === 0) {
+        container.innerHTML = `<div style="padding: 12px; background: var(--bg-light); border-radius: 12px; color: var(--text-muted); text-align: center;"><span>📝 Add tasks to blocks first, then track distractions here</span></div>`;
+        return;
+    }
+    let html = '';
     for (let i = 0; i < blocksCount; i++) {
-        if (!blockTasksMap[i] || blockTasksMap[i].length === 0) {
-            missingBlocks.push(i + 1);
-        } else if (!blockCompletionMap[i]) {
-            uncompletedBlocks.push(i + 1);
-        }
+        const blockName = getBlockNameByIndex(i);
+        const blockDistractions = distractionLogs[i] || [];
+        html += `<div class="distraction-block-row">
+            <div class="distraction-header"><span>📌 ${escapeHtml(blockName)}</span><span class="distraction-badge">${blockDistractions.length} distraction${blockDistractions.length !== 1 ? 's' : ''}</span></div>
+            <div class="distraction-list" id="distraction-list-${i}">${blockDistractions.map((d, dIdx) => `<span class="distraction-tag">${escapeHtml(d.distractionType)}${d.customText ? `: ${escapeHtml(d.customText)}` : ''}<span class="distraction-tag-remove" onclick="removeDistraction(${i}, ${dIdx})">✕</span></span>`).join('')}${blockDistractions.length === 0 ? '<span style="color: var(--text-muted); font-size: 0.75rem;">No distractions logged for this block</span>' : ''}</div>
+            <select id="distraction-select-${i}" class="distraction-select" onchange="handleDistractionSelectChange(${i})"><option value="">— What distracted you? —</option>${distractionTypes.map(d => `<option value="${escapeHtml(d.value)}">${escapeHtml(d.label)}</option>`).join('')}</select>
+            <div class="distraction-custom-input" id="custom-distraction-${i}" style="display: none;"><input type="text" id="custom-text-${i}" placeholder="Describe the distraction..." class="form-input"><button type="button" class="btn-sm btn-primary" onclick="addCustomDistraction(${i})">Add</button></div>
+            <div style="margin-top: 8px; display: flex; gap: 8px;"><button type="button" class="btn-sm btn-secondary" onclick="addSelectedDistraction(${i})">➕ Add Selected</button><button type="button" class="btn-sm btn-secondary" onclick="toggleCustomInput(${i})">✏️ Add Custom</button></div>
+        </div>`;
     }
-    
-    if (missingBlocks.length > 0) {
-        showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')} before finishing.`, "error");
-        return false;
-    }
-    
-    if (uncompletedBlocks.length > 0) {
-        showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed before finishing.`, "error");
-        return false;
-    }
-    
-    blockAssignmentFinished = true;
-    document.getElementById('assignmentStatusMsg').innerHTML = '✅ Block assignments finalized! Productivity score calculated.';
-    showAlert("✅ Great! All blocks completed. Your productivity score has been calculated.", "success");
-    return true;
+    container.innerHTML = html;
 }
 
-function getBlockNameByIndex(idx) {
-    const blockTasksRaw = document.getElementById('block-tasks').value;
-    if (!blockTasksRaw) return `Block ${idx + 1}`;
-    const parts = blockTasksRaw.split(',').map(s => s.trim());
-    if (parts[idx]) {
-        return parts[idx].replace(/\s*\([\d.]+\s*h?\)/, '').trim();
+function handleDistractionSelectChange(blockIdx) {
+    const select = document.getElementById(`distraction-select-${blockIdx}`);
+    if (select && select.value === '✨ Other') {
+        document.getElementById(`custom-distraction-${blockIdx}`).style.display = 'flex';
+    } else if (select) {
+        document.getElementById(`custom-distraction-${blockIdx}`).style.display = 'none';
     }
-    return `Block ${idx + 1}`;
 }
+
+function addSelectedDistraction(blockIdx) {
+    const select = document.getElementById(`distraction-select-${blockIdx}`);
+    if (!select || !select.value) { showAlert("Please select a distraction type", "warning"); return; }
+    if (!distractionLogs[blockIdx]) distractionLogs[blockIdx] = [];
+    distractionLogs[blockIdx].push({ distractionType: select.value, customText: null });
+    select.value = "";
+    document.getElementById(`custom-distraction-${blockIdx}`).style.display = 'none';
+    renderDistractionTrackerUI();
+    updateDistractionPatterns();
+    showAlert(`🚫 Added distraction: ${select.options[select.selectedIndex]?.text || select.value}`, "success");
+}
+
+function addCustomDistraction(blockIdx) {
+    const input = document.getElementById(`custom-text-${blockIdx}`);
+    const customText = input.value.trim();
+    if (!customText) { showAlert("Please describe the distraction", "warning"); return; }
+    if (!distractionLogs[blockIdx]) distractionLogs[blockIdx] = [];
+    distractionLogs[blockIdx].push({ distractionType: customText, customText: customText });
+    input.value = "";
+    document.getElementById(`custom-distraction-${blockIdx}`).style.display = 'none';
+    renderDistractionTrackerUI();
+    updateDistractionPatterns();
+    showAlert(`🚫 Added custom distraction: ${customText}`, "success");
+}
+
+function removeDistraction(blockIdx, distractionIdx) {
+    if (distractionLogs[blockIdx]) {
+        distractionLogs[blockIdx].splice(distractionIdx, 1);
+        renderDistractionTrackerUI();
+        updateDistractionPatterns();
+        showAlert(`🗑️ Removed distraction`, "warning");
+    }
+}
+
+function toggleCustomInput(blockIdx) {
+    const customDiv = document.getElementById(`custom-distraction-${blockIdx}`);
+    if (customDiv) customDiv.style.display = customDiv.style.display === 'none' ? 'flex' : 'none';
+}
+
+function updateDistractionPatterns() {
+    const allDistractions = [];
+    for (let blockIdx in distractionLogs) if (distractionLogs[blockIdx]) allDistractions.push(...distractionLogs[blockIdx]);
+    const patternsCard = document.getElementById('distractionPatternsCard');
+    const patternsText = document.getElementById('distractionPatternsText');
+    const suggestionsText = document.getElementById('distractionSuggestionsText');
+    if (allDistractions.length === 0) { patternsCard.style.display = 'none'; return; }
+    patternsCard.style.display = 'block';
+    const freq = {};
+    allDistractions.forEach(d => freq[d.distractionType] = (freq[d.distractionType] || 0) + 1);
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    const topDistractions = sorted.slice(0, 3);
+    patternsText.innerHTML = `<strong>Top distractions today:</strong> ${topDistractions.map(d => `${d[0]} (${d[1]}x)`).join(', ')}`;
+    let suggestions = [];
+    const typesLower = allDistractions.map(d => d.distractionType.toLowerCase());
+    if (typesLower.some(d => d.includes('social') || d.includes('media'))) suggestions.push("📱 Use website blockers or schedule specific social media breaks");
+    if (typesLower.some(d => d.includes('phone') || d.includes('call'))) suggestions.push("📞 Put your phone on Do Not Disturb mode during work blocks");
+    if (typesLower.some(d => d.includes('noise'))) suggestions.push("🔊 Try noise-cancelling headphones or ambient focus music");
+    if (typesLower.some(d => d.includes('message') || d.includes('chat'))) suggestions.push("💬 Close messaging apps and set status to 'Focusing'");
+    if (typesLower.some(d => d.includes('fatigue') || d.includes('tired'))) suggestions.push("😴 Take a 5-minute break, hydrate, or stretch");
+    if (typesLower.some(d => d.includes('email'))) suggestions.push("📧 Schedule specific times for checking emails");
+    if (suggestions.length === 0) suggestions.push("🎯 Try the Pomodoro technique: 25 min focus, 5 min break");
+    suggestionsText.innerHTML = `<strong>💡 Suggestions to minimize distractions:</strong><br>• ${suggestions.join('<br>• ')}`;
+}
+
+function showDistractionInsightsModal() {
+    const allDistractions = [];
+    for (let blockIdx in distractionLogs) if (distractionLogs[blockIdx]) allDistractions.push(...distractionLogs[blockIdx]);
+    if (allDistractions.length === 0) { showAlert("No distractions logged yet", "warning"); return; }
+    const blockDistractionCount = {};
+    for (let blockIdx in distractionLogs) if (distractionLogs[blockIdx]) blockDistractionCount[`Block ${parseInt(blockIdx) + 1}`] = distractionLogs[blockIdx].length;
+    const freq = {};
+    allDistractions.forEach(d => freq[d.distractionType] = (freq[d.distractionType] || 0) + 1);
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    const recommendations = [];
+    const typesLower = allDistractions.map(d => d.distractionType.toLowerCase());
+    if (typesLower.some(t => t.includes('social'))) recommendations.push("Use app blockers during work hours (Freedom, Cold Turkey)");
+    if (typesLower.some(t => t.includes('phone'))) recommendations.push("Keep phone in another room or use Focus Mode");
+    if (typesLower.some(t => t.includes('noise'))) recommendations.push("Create a dedicated quiet workspace or use white noise");
+    if (typesLower.some(t => t.includes('message'))) recommendations.push("Set specific 'office hours' for responding to messages");
+    if (recommendations.length === 0) recommendations.push("Try the Pomodoro technique (25 min work, 5 min break)");
+    const insightsHtml = `<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">🚫 Distraction Insights</h3><div style="margin-bottom: 20px;"><h4>📊 Distraction Breakdown</h4><ul style="list-style: none; padding-left: 0;">${sorted.map(([type, count]) => `<li style="padding: 8px 0; border-bottom: 1px solid var(--border-color);">${type}: ${count} time${count !== 1 ? 's' : ''}</li>`).join('')}</ul></div><div style="margin-bottom: 20px;"><h4>📌 By Block</h4><ul style="list-style: none; padding-left: 0;">${Object.entries(blockDistractionCount).map(([block, count]) => `<li style="padding: 4px 0;">${block}: ${count} distraction${count !== 1 ? 's' : ''}</li>`).join('')}</ul></div><div style="padding: 12px; background: rgba(245,158,11,0.1); border-radius: 10px;"><h4>💡 Recommendations</h4><ul style="margin-left: 20px;">${recommendations.map(r => `<li>${r}</li>`).join('')}</ul></div><button onclick="closeDistractionInsightsModal()" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Close</button></div>`;
+    const modalHtml = `<div id="distraction-insights-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10002; backdrop-filter: blur(4px);"><div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">${insightsHtml}</div></div>`;
+    closeDistractionInsightsModal();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeDistractionInsightsModal() { const modal = document.getElementById('distraction-insights-modal'); if (modal) modal.remove(); }
 
 // ============================================
 // TASK MANAGEMENT
@@ -529,16 +519,14 @@ function addTask() {
     const input = document.getElementById('task-input');
     const val = input.value.trim();
     if (val) {
-        if (taskList.includes(val)) {
-            showAlert("⚠️ Task already exists!", "warning");
-            return;
-        }
+        if (taskList.includes(val)) { showAlert("⚠️ Task already exists!", "warning"); return; }
         taskList.push(val);
         updateTaskListUI();
         input.value = '';
         input.focus();
         document.getElementById('tasks').value = taskList.join(', ');
         renderBlockAssignmentUI();
+        renderDistractionTrackerUI();
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
     }
@@ -546,12 +534,7 @@ function addTask() {
 
 function updateTaskListUI() {
     const list = document.getElementById('task-checklist');
-    list.innerHTML = taskList.map((t, i) => `
-        <li>
-            <span>${escapeHtml(t)}</span>
-            <span class="delete-task" onclick="removeTask(${i})">✕</span>
-        </li>
-    `).join('');
+    list.innerHTML = taskList.map((t, i) => `<li><span>${escapeHtml(t)}</span><span class="delete-task" onclick="removeTask(${i})">✕</span></li>`).join('');
 }
 
 function removeTask(index) {
@@ -559,8 +542,6 @@ function removeTask(index) {
     taskList.splice(index, 1);
     updateTaskListUI();
     document.getElementById('tasks').value = taskList.join(', ');
-    
-    // Remove this task from all blocks
     for (let blockIdx in blockTasksMap) {
         blockTasksMap[blockIdx] = blockTasksMap[blockIdx].filter(t => t.taskName !== removedTask);
         if (blockTasksMap[blockIdx].length === 0) {
@@ -571,10 +552,7 @@ function removeTask(index) {
             delete blockRatingMap[blockIdx];
         }
     }
-    
     renderBlockAssignmentUI();
-    blockAssignmentFinished = false;
-    document.getElementById('assignmentStatusMsg').innerHTML = '';
     updateAutoProductivityDisplay();
     showAlert(`🗑️ Removed "${removedTask}"`, "warning");
 }
@@ -591,11 +569,10 @@ function login() {
     document.getElementById("greeting-name").textContent = currentUser;
     document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
     document.getElementById('daily-quote').textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
-    setTimeout(() => autoGenerateBlocksManual(), 100);
+    setTimeout(() => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); }, 100);
     setupEventListeners();
     if (Notification.permission === "granted") { showReminderSettings(); setupReminderSystem(); }
     addWorkTimeSuggestionCard();
-    renderBlockAssignmentUI();
 }
 
 function logout() {
@@ -607,6 +584,7 @@ function logout() {
     blockTasksMap = {};
     blockCompletionMap = {};
     blockRatingMap = {};
+    distractionLogs = {};
     blockAssignmentFinished = false;
     updateAutoProductivityDisplay();
 }
@@ -615,27 +593,12 @@ function setupEventListeners() {
     const blocksInput = document.getElementById('blocks');
     const hoursInput = document.getElementById('total-hours');
     const blockTasksInput = document.getElementById('block-tasks');
-
-    if (blocksInput) blocksInput.addEventListener('change', autoGenerateBlocksManual);
-    if (hoursInput) hoursInput.addEventListener('change', autoGenerateBlocksManual);
-    
+    if (blocksInput) blocksInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
+    if (hoursInput) hoursInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
     if (blockTasksInput) {
-        blockTasksInput.addEventListener('change', parseAndUpdateBlockTimes);
-        blockTasksInput.addEventListener('blur', parseAndUpdateBlockTimes);
+        blockTasksInput.addEventListener('change', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
+        blockTasksInput.addEventListener('blur', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
     }
-}
-
-function showAlert(msg, type = "info") {
-    const alertDiv = document.createElement('div');
-    alertDiv.style.cssText = `
-        position: fixed; bottom: 20px; right: 20px; padding: 16px 24px; 
-        background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#3B82F6'};
-        color: white; border-radius: 12px; z-index: 9999; animation: slideInUp 0.3s ease-out;
-        font-weight: 600; max-width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    `;
-    alertDiv.textContent = msg;
-    document.body.appendChild(alertDiv);
-    setTimeout(() => alertDiv.remove(), 3000);
 }
 
 // ============================================
@@ -644,42 +607,19 @@ function showAlert(msg, type = "info") {
 
 function saveEntry() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
-    
-    const missingBlocks = [];
-    const uncompletedBlocks = [];
-    
+    const missingBlocks = [], uncompletedBlocks = [];
     for (let i = 0; i < blocksCount; i++) {
-        if (!blockTasksMap[i] || blockTasksMap[i].length === 0) {
-            missingBlocks.push(i + 1);
-        } else if (!blockCompletionMap[i]) {
-            uncompletedBlocks.push(i + 1);
-        }
+        if (!blockTasksMap[i] || blockTasksMap[i].length === 0) missingBlocks.push(i + 1);
+        else if (!blockCompletionMap[i]) uncompletedBlocks.push(i + 1);
     }
-    
-    if (missingBlocks.length > 0) {
-        showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error");
-        return;
-    }
-    
-    if (uncompletedBlocks.length > 0) {
-        showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error");
-        return;
-    }
-    
+    if (missingBlocks.length > 0) { showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error"); return; }
+    if (uncompletedBlocks.length > 0) { showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error"); return; }
     const autoScore = calculateAutoProductivityScore();
     const finalProductivity = autoScore !== null ? autoScore : 5;
-    
-    // Prepare block data for storage
     const blockMultiTasksData = {};
-    for (let i = 0; i < blocksCount; i++) {
-        if (blockTasksMap[i]) {
-            blockMultiTasksData[i] = blockTasksMap[i].map(t => ({
-                taskName: t.taskName,
-                rating: t.rating
-            }));
-        }
-    }
-    
+    for (let i = 0; i < blocksCount; i++) if (blockTasksMap[i]) blockMultiTasksData[i] = blockTasksMap[i].map(t => ({ taskName: t.taskName, rating: t.rating }));
+    const distractionData = {};
+    for (let i = 0; i < blocksCount; i++) if (distractionLogs[i] && distractionLogs[i].length > 0) distractionData[i] = [...distractionLogs[i]];
     const entry = {
         timestamp: new Date().toISOString(),
         date: new Date().toLocaleDateString('en-GB'),
@@ -691,13 +631,12 @@ function saveEntry() {
         blockCompletionMap: { ...blockCompletionMap },
         blockRatingMap: { ...blockRatingMap },
         productivity: finalProductivity,
-        comments: document.getElementById('comments').value
+        comments: document.getElementById('comments').value,
+        distractions: distractionData
     };
-    
     let history = getHistory();
     history.push(entry);
     localStorage.setItem('productivity_history', JSON.stringify(history));
-    
     showAlert(`✅ Entry saved successfully! Productivity score: ${finalProductivity}/10`, 'success');
     resetForm();
 }
@@ -715,31 +654,22 @@ function resetForm() {
     blockTasksMap = {};
     blockCompletionMap = {};
     blockRatingMap = {};
+    distractionLogs = {};
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
-    setTimeout(() => autoGenerateBlocksManual(), 100);
+    setTimeout(() => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); }, 100);
     updateAutoProductivityDisplay();
+    updateDistractionPatterns();
 }
 
-function getHistory() {
-    const stored = localStorage.getItem('productivity_history');
-    return stored ? JSON.parse(stored) : [];
-}
+function getHistory() { const stored = localStorage.getItem('productivity_history'); return stored ? JSON.parse(stored) : []; }
 
 // ============================================
-// HISTORY SCREEN FUNCTIONS
+// HISTORY SCREEN
 // ============================================
 
-function showHistoryScreen() {
-    document.getElementById('main-screen').classList.add('hidden');
-    document.getElementById('history-screen').classList.remove('hidden');
-    loadHistoryData();
-}
-
-function backToDashboard() {
-    document.getElementById('history-screen').classList.add('hidden');
-    document.getElementById('main-screen').classList.remove('hidden');
-}
+function showHistoryScreen() { document.getElementById('main-screen').classList.add('hidden'); document.getElementById('history-screen').classList.remove('hidden'); loadHistoryData(); }
+function backToDashboard() { document.getElementById('history-screen').classList.add('hidden'); document.getElementById('main-screen').classList.remove('hidden'); }
 
 function loadHistoryData() {
     const history = getHistory();
@@ -751,68 +681,38 @@ function loadHistoryData() {
     loadHeatmapChart();
     loadCorrelationChart();
     loadBlockRatingsChart();
+    loadDistractionChart();
 }
 
 function displayStats() {
     const history = filteredHistoryData;
-    if (history.length === 0) {
-        document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No data yet. Start logging your productivity!</p></div>';
-        return;
-    }
-    
+    if (history.length === 0) { document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No data yet. Start logging your productivity!</p></div>'; return; }
     const totalEntries = history.length;
     const avgProductivity = (history.reduce((sum, h) => sum + (parseInt(h.productivity) || 0), 0) / totalEntries).toFixed(1);
     const totalHours = history.reduce((sum, h) => sum + (parseFloat(h.totalHours) || 0), 0).toFixed(1);
     const mostFrequentMood = getMostFrequent(history.map(h => h.mood));
-    
-    document.getElementById('statsGrid').innerHTML = `
-        <div class="stat-card"><div class="stat-label">📊 Total Entries</div><div class="stat-value">${totalEntries}</div></div>
-        <div class="stat-card"><div class="stat-label">⭐ Avg Productivity</div><div class="stat-value">${avgProductivity}/10</div></div>
-        <div class="stat-card"><div class="stat-label">⏱️ Total Hours</div><div class="stat-value">${totalHours}h</div></div>
-        <div class="stat-card"><div class="stat-label">😊 Mood</div><div class="stat-value">${mostFrequentMood}</div></div>
-    `;
+    let totalDistractions = 0;
+    history.forEach(entry => { if (entry.distractions) Object.values(entry.distractions).forEach(distList => totalDistractions += distList.length); });
+    document.getElementById('statsGrid').innerHTML = `<div class="stat-card"><div class="stat-label">📊 Total Entries</div><div class="stat-value">${totalEntries}</div></div><div class="stat-card"><div class="stat-label">⭐ Avg Productivity</div><div class="stat-value">${avgProductivity}/10</div></div><div class="stat-card"><div class="stat-label">⏱️ Total Hours</div><div class="stat-value">${totalHours}h</div></div><div class="stat-card"><div class="stat-label">😊 Mood</div><div class="stat-value">${mostFrequentMood}</div></div><div class="stat-card"><div class="stat-label">🚫 Distractions</div><div class="stat-value">${totalDistractions}</div></div>`;
 }
 
-function getMostFrequent(arr) {
-    const counts = {};
-    arr.forEach(item => counts[item] = (counts[item] || 0) + 1);
-    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-}
+function getMostFrequent(arr) { const counts = {}; arr.forEach(item => counts[item] = (counts[item] || 0) + 1); return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b); }
 
 function displayHistory() {
     const history = filteredHistoryData;
     const list = document.getElementById('history-list');
-    
-    if (history.length === 0) {
-        list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>';
-        return;
-    }
-    
-    list.innerHTML = history.slice().reverse().map((entry, idx) => `
-        <div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})">
-            <div class="history-item-header">
-                <div class="history-date">
-                    <span class="date-full">${entry.date}</span>
-                    <span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span>
-                </div>
-                <div class="history-mood">${entry.mood}</div>
-            </div>
-            <div class="history-quick-stats">
-                <div class="quick-stat"><span class="stat-text productivity-${entry.productivity >= 8 ? 'high' : entry.productivity >= 5 ? 'medium' : 'low'}">⭐ ${entry.productivity}/10</span></div>
-                <div class="quick-stat">⏱️ ${entry.totalHours}h</div>
-                <div class="quick-stat">📦 ${entry.blocks} blocks</div>
-            </div>
-            <p class="history-tasks">${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p>
-            <div class="history-item-action">View Details →</div>
-        </div>
-    `).join('');
+    if (history.length === 0) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>'; return; }
+    list.innerHTML = history.slice().reverse().map((entry, idx) => {
+        let distractionCount = 0;
+        if (entry.distractions) Object.values(entry.distractions).forEach(distList => distractionCount += distList.length);
+        return `<div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})"><div class="history-item-header"><div class="history-date"><span class="date-full">${entry.date}</span><span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span></div><div class="history-mood">${entry.mood}</div></div><div class="history-quick-stats"><div class="quick-stat"><span class="stat-text productivity-${entry.productivity >= 8 ? 'high' : entry.productivity >= 5 ? 'medium' : 'low'}">⭐ ${entry.productivity}/10</span></div><div class="quick-stat">⏱️ ${entry.totalHours}h</div><div class="quick-stat">📦 ${entry.blocks} blocks</div>${distractionCount > 0 ? `<div class="quick-stat">🚫 ${distractionCount} distractions</div>` : ''}</div><p class="history-tasks">${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p><div class="history-item-action">View Details →</div></div>`;
+    }).join('');
 }
 
 function showEntryDetail(idx) {
     const history = getHistory();
     const entry = history[idx];
     const detailContent = document.getElementById('detail-content');
-    
     let blockDetails = '';
     if (entry.blockMultiTasks) {
         for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
@@ -820,49 +720,32 @@ function showEntryDetail(idx) {
             if (tasks && tasks.length > 0) {
                 const completed = entry.blockCompletionMap && entry.blockCompletionMap[i] ? '✅' : '⏳';
                 const avgRating = entry.blockRatingMap && entry.blockRatingMap[i] ? `⭐ ${entry.blockRatingMap[i]}/10` : 'Not rated';
-                blockDetails += `
-                    <div style="padding: 10px; background: var(--bg-light); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid var(--primary);">
-                        <strong>Block ${parseInt(i) + 1}:</strong><br>
-                        ${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝 Not rated'}`).join('<br>')}
-                        <br>
-                        <span style="font-size: 0.85rem; color: var(--text-muted);">${completed} ${avgRating}</span>
-                    </div>
-                `;
+                blockDetails += `<div style="padding: 10px; background: var(--bg-light); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid var(--primary);"><strong>Block ${parseInt(i) + 1}:</strong><br>${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝 Not rated'}`).join('<br>')}<br><span style="font-size: 0.85rem; color: var(--text-muted);">${completed} ${avgRating}</span></div>`;
             }
         }
     }
-    
-    detailContent.innerHTML = `
-        <div class="detail-header">
-            <h2 class="detail-title">${entry.date}</h2>
-            <p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-        </div>
-        <div class="detail-grid">
-            <div class="detail-item"><span class="detail-label">Mood</span><div class="detail-value">${entry.mood}</div></div>
-            <div class="detail-item"><span class="detail-label">Productivity</span><div class="detail-value">${entry.productivity}/10</div></div>
-            <div class="detail-item"><span class="detail-label">Hours</span><div class="detail-value">${entry.totalHours}h</div></div>
-            <div class="detail-item"><span class="detail-label">Blocks</span><div class="detail-value">${entry.blocks}</div></div>
-        </div>
-        <div class="detail-section">
-            <h3>📋 Tasks</h3>
-            <p>${escapeHtml(entry.tasks)}</p>
-        </div>
-        ${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details (Multi-Task)</h3>${blockDetails}</div>` : ''}
-        ${entry.comments ? `<div class="detail-section"><h3>💭 Notes</h3><p>${escapeHtml(entry.comments)}</p></div>` : ''}
-    `;
-    
+    let distractionDetails = '';
+    if (entry.distractions && Object.keys(entry.distractions).length > 0) {
+        distractionDetails = '<div class="detail-section"><h3>🚫 Distractions Logged</h3>';
+        for (let blockIdx in entry.distractions) {
+            const distractions = entry.distractions[blockIdx];
+            if (distractions && distractions.length > 0) {
+                distractionDetails += `<div style="margin-bottom: 10px;"><strong>Block ${parseInt(blockIdx) + 1}:</strong><br>`;
+                distractions.forEach(d => { distractionDetails += `<span class="distraction-tag" style="margin-right: 6px;">${escapeHtml(d.distractionType)}</span>`; });
+                distractionDetails += `</div>`;
+            }
+        }
+        distractionDetails += '</div>';
+    }
+    detailContent.innerHTML = `<div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p></div><div class="detail-grid"><div class="detail-item"><span class="detail-label">Mood</span><div class="detail-value">${entry.mood}</div></div><div class="detail-item"><span class="detail-label">Productivity</span><div class="detail-value">${entry.productivity}/10</div></div><div class="detail-item"><span class="detail-label">Hours</span><div class="detail-value">${entry.totalHours}h</div></div><div class="detail-item"><span class="detail-label">Blocks</span><div class="detail-value">${entry.blocks}</div></div></div><div class="detail-section"><h3>📋 Tasks</h3><p>${escapeHtml(entry.tasks)}</p></div>${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details (Multi-Task)</h3>${blockDetails}</div>` : ''}${distractionDetails}${entry.comments ? `<div class="detail-section"><h3>💭 Notes</h3><p>${escapeHtml(entry.comments)}</p></div>` : ''}`;
     document.getElementById('detail-modal').classList.remove('hidden');
 }
 
-function closeDetailModal() {
-    document.getElementById('detail-modal').classList.add('hidden');
-}
-
+function closeDetailModal() { document.getElementById('detail-modal').classList.add('hidden'); }
 function filterHistory() {
     const moodFilter = document.getElementById('mood-filter').value;
     const productivityFilter = document.getElementById('productivity-filter').value;
     const history = getHistory();
-    
     filteredHistoryData = history.filter(entry => {
         const moodMatch = !moodFilter || entry.mood === moodFilter;
         let productivityMatch = !productivityFilter;
@@ -871,201 +754,99 @@ function filterHistory() {
         else if (productivityFilter === 'low') productivityMatch = parseInt(entry.productivity) < 5;
         return moodMatch && productivityMatch;
     });
-    
     displayHistory();
 }
-
-function resetFilters() {
-    document.getElementById('mood-filter').value = '';
-    document.getElementById('productivity-filter').value = '';
-    filteredHistoryData = getHistory();
-    displayHistory();
-}
-
-function clearAllHistory() {
-    if (confirm('⚠️ Are you sure? This will delete all productivity entries permanently!')) {
-        localStorage.removeItem('productivity_history');
-        showAlert('🗑️ All history cleared', 'success');
-        loadHistoryData();
-    }
-}
+function resetFilters() { document.getElementById('mood-filter').value = ''; document.getElementById('productivity-filter').value = ''; filteredHistoryData = getHistory(); displayHistory(); }
+function clearAllHistory() { if (confirm('⚠️ Are you sure? This will delete all productivity entries permanently!')) { localStorage.removeItem('productivity_history'); showAlert('🗑️ All history cleared', 'success'); loadHistoryData(); } }
 
 // ============================================
 // CHART FUNCTIONS
 // ============================================
 
-function switchChartTab(tab, event) {
-    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.chart-container').forEach(c => c.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById(`${tab}-chart-container`).classList.add('active');
-}
+function switchChartTab(tab, event) { document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.chart-container').forEach(c => c.classList.remove('active')); event.target.classList.add('active'); document.getElementById(`${tab}-chart-container`).classList.add('active'); }
 
 function loadProductivityTrendChart() {
     const history = getHistory();
     const ctx = document.getElementById('productivityTrendChart').getContext('2d');
-    if (history.length === 0) {
-        document.getElementById('trend-insight').innerHTML = '📭 No data available. Log entries to see your productivity trend!';
-        if (productivityChart) productivityChart.destroy();
-        return;
-    }
+    if (history.length === 0) { document.getElementById('trend-insight').innerHTML = '📭 No data available.'; if (productivityChart) productivityChart.destroy(); return; }
     const labels = history.map(h => h.date);
     const data = history.map(h => parseInt(h.productivity));
     const avgProductivity = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
     if (productivityChart) productivityChart.destroy();
-    productivityChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets: [{ label: 'Productivity Rating', data, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', tension: 0.4, pointRadius: 6, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', pointBorderWidth: 2 }] },
-        options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } }, plugins: { legend: { display: true }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12 } } }
-    });
-    document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>. ${avgProductivity >= 8 ? 'Excellent consistency! 🎉' : avgProductivity >= 6 ? 'Good progress, keep it up!' : 'Room for improvement. Try adjusting your routine.'}`;
+    productivityChart = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'Productivity Rating', data, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', tension: 0.4, pointRadius: 6, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', pointBorderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } } } });
+    document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>. ${avgProductivity >= 8 ? 'Excellent consistency! 🎉' : avgProductivity >= 6 ? 'Good progress, keep it up!' : 'Room for improvement.'}`;
 }
 
 function loadMoodDistributionChart() {
     const history = getHistory();
     const ctx = document.getElementById('moodDistributionChart').getContext('2d');
-    if (history.length === 0) {
-        document.getElementById('mood-insight').innerHTML = '📭 No data available. Log entries to see mood distribution!';
-        if (moodChart) moodChart.destroy();
-        return;
-    }
+    if (history.length === 0) { document.getElementById('mood-insight').innerHTML = '📭 No data available.'; if (moodChart) moodChart.destroy(); return; }
     const moodCounts = {};
     history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
-    const moodLabels = Object.keys(moodCounts);
-    const moodData = Object.values(moodCounts);
     if (moodChart) moodChart.destroy();
-    moodChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels: moodLabels, datasets: [{ data: moodData, backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8 }] },
-        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: true, position: 'bottom' } } }
-    });
-    const dominantMood = moodLabels[moodData.indexOf(Math.max(...moodData))];
-    document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Insight:</strong> Your dominant mood is <strong>${dominantMood}</strong>. This shows your overall emotional state during work sessions.`;
+    moodChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(moodCounts), datasets: [{ data: Object.values(moodCounts), backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8 }] }, options: { responsive: true } });
+    document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Insight:</strong> Your dominant mood is <strong>${getMostFrequent(history.map(h => h.mood))}</strong>.`;
 }
 
 function loadHeatmapChart() {
     const history = getHistory();
     const container = document.getElementById('heatmap-calendar');
-    if (history.length === 0) {
-        document.getElementById('heatmap-insight').innerHTML = '📭 No data available. Log entries to see your heatmap!';
-        return;
-    }
+    if (history.length === 0) { document.getElementById('heatmap-insight').innerHTML = '📭 No data available.'; return; }
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    let html = '<div class="heatmap-calendar">';
     const entryMap = {};
-    history.forEach(entry => {
-        const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB');
-        entryMap[date] = parseInt(entry.productivity);
-    });
+    history.forEach(entry => { const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB'); entryMap[date] = parseInt(entry.productivity); });
+    let html = '<div class="heatmap-calendar">';
     let currentDate = new Date(thirtyDaysAgo);
     while (currentDate <= today) {
         const dateStr = currentDate.toLocaleDateString('en-GB');
         const productivity = entryMap[dateStr] || 0;
-        const className = `productivity-${productivity}`;
-        html += `<div class="heatmap-day ${className}" title="${dateStr}: ${productivity > 0 ? productivity + '/10' : 'No entry'}">${currentDate.getDate()}</div>`;
+        html += `<div class="heatmap-day productivity-${productivity}" title="${dateStr}: ${productivity > 0 ? productivity + '/10' : 'No entry'}">${currentDate.getDate()}</div>`;
         currentDate.setDate(currentDate.getDate() + 1);
     }
     html += '</div>';
     container.innerHTML = html;
-    
-    const currentDate2 = new Date();
-    let currentStreak = 0, bestStreak = 0, tempStreak = 0;
-    for (let d = new Date(currentDate2); d >= thirtyDaysAgo; d.setDate(d.getDate() - 1)) {
-        const dateStr = d.toLocaleDateString('en-GB');
-        if (entryMap[dateStr]) { tempStreak++; } else { bestStreak = Math.max(bestStreak, tempStreak); tempStreak = 0; }
-    }
-    bestStreak = Math.max(bestStreak, tempStreak);
-    for (let d = new Date(currentDate2); d >= thirtyDaysAgo; d.setDate(d.getDate() - 1)) {
-        const dateStr = d.toLocaleDateString('en-GB');
-        if (entryMap[dateStr]) { currentStreak++; } else { break; }
-    }
-    document.getElementById('heatmap-insight').innerHTML = `🔥 <strong>Consistency Tracker:</strong> Current streak: <strong>${currentStreak}</strong> days | Best streak: <strong>${bestStreak}</strong> days. ${currentStreak >= 7 ? 'Amazing consistency! 🎉' : currentStreak >= 3 ? 'Great momentum! Keep going!' : 'Start building your streak today!'}`;
+    document.getElementById('heatmap-insight').innerHTML = `🔥 <strong>Consistency Tracker:</strong> Keep building your streak!`;
 }
 
 function loadCorrelationChart() {
     const history = getHistory();
     const ctx = document.getElementById('correlationChart').getContext('2d');
-    if (history.length === 0) {
-        document.getElementById('correlation-insight').innerHTML = '📭 No data available. Log entries to see correlation between hours and productivity!';
-        if (correlationChart) correlationChart.destroy();
-        return;
-    }
+    if (history.length === 0) { document.getElementById('correlation-insight').innerHTML = '📭 No data available.'; if (correlationChart) correlationChart.destroy(); return; }
     const scatterData = history.map(entry => ({ x: parseFloat(entry.totalHours), y: parseInt(entry.productivity), mood: entry.mood }));
-    const focusedData = scatterData.filter(d => d.mood === '🔥');
-    const happyData = scatterData.filter(d => d.mood === '😊');
-    const tiredData = scatterData.filter(d => d.mood === '😴');
-    const hours = scatterData.map(d => d.x);
-    const productivity = scatterData.map(d => d.y);
-    const n = hours.length;
-    const sumX = hours.reduce((a, b) => a + b, 0);
-    const sumY = productivity.reduce((a, b) => a + b, 0);
-    const sumXY = hours.reduce((sum, xi, i) => sum + xi * productivity[i], 0);
-    const sumX2 = hours.reduce((sum, xi) => sum + xi * xi, 0);
-    const sumY2 = productivity.reduce((sum, yi) => sum + yi * yi, 0);
-    const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-    const correlation = denominator === 0 ? 0 : numerator / denominator;
     if (correlationChart) correlationChart.destroy();
-    correlationChart = new Chart(ctx, {
-        type: 'scatter',
-        data: { datasets: [{ label: '🔥 Focused', data: focusedData, backgroundColor: '#1B4D3E', pointRadius: 8 }, { label: '😊 Happy', data: happyData, backgroundColor: '#2A7F6F', pointRadius: 8 }, { label: '😴 Tired', data: tiredData, backgroundColor: '#D4A574', pointRadius: 8 }] },
-        options: { responsive: true, maintainAspectRatio: true, scales: { x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12, ticks: { stepSize: 1 } }, y: { title: { display: true, text: 'Productivity Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } } }, plugins: { tooltip: { callbacks: { label: (ctx) => { const p = ctx.raw; return [`Hours: ${p.x}h`, `Productivity: ${p.y}/10`, `Mood: ${p.mood}`]; } } } } }
-    });
-    let correlationText = '', recommendation = '';
-    if (Math.abs(correlation) < 0.3) { correlationText = 'weak'; recommendation = 'Hours worked doesn\'t strongly predict your productivity. Focus on quality over quantity!'; }
-    else if (Math.abs(correlation) < 0.7) { correlationText = 'moderate'; recommendation = correlation > 0 ? 'More hours generally means higher productivity, but find your sweet spot.' : 'Working fewer hours might actually boost your productivity!'; }
-    else { correlationText = 'strong'; recommendation = correlation > 0 ? 'There\'s a strong positive relationship. Consider optimizing your workflow during peak hours.' : 'Strong inverse relationship - you\'re most productive with fewer hours. Take more breaks!'; }
-    const direction = correlation > 0 ? 'positive' : 'negative';
-    document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> ${correlationText} ${direction} correlation (r = ${correlation.toFixed(2)}) between hours worked and productivity.<br><br>💡 <strong>Recommendation:</strong> ${recommendation}`;
+    correlationChart = new Chart(ctx, { type: 'scatter', data: { datasets: [{ label: 'Entries', data: scatterData, backgroundColor: '#1B4D3E', pointRadius: 8 }] }, options: { responsive: true, scales: { x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12 }, y: { title: { display: true, text: 'Productivity (/10)' }, min: 0, max: 10 } } } });
+    document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> Track your hours vs productivity to find your optimal work duration.`;
 }
 
 function loadBlockRatingsChart() {
     const history = getHistory();
     const ctx = document.getElementById('blockRatingsChart').getContext('2d');
-    if (history.length === 0 || !history.some(h => h.blockRatingMap && Object.keys(h.blockRatingMap).length > 0)) {
-        document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available. Start rating your blocks to see analysis!';
-        if (blockRatingsChart) blockRatingsChart.destroy();
-        return;
-    }
-    
+    if (history.length === 0 || !history.some(h => h.blockRatingMap && Object.keys(h.blockRatingMap).length > 0)) { document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available.'; if (blockRatingsChart) blockRatingsChart.destroy(); return; }
     const blockRatingsAggregate = {};
-    history.forEach(entry => {
-        if (entry.blockRatingMap) {
-            Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => {
-                if (!blockRatingsAggregate[blockIdx]) {
-                    blockRatingsAggregate[blockIdx] = { sum: 0, count: 0, ratings: [] };
-                }
-                blockRatingsAggregate[blockIdx].sum += rating;
-                blockRatingsAggregate[blockIdx].count++;
-                blockRatingsAggregate[blockIdx].ratings.push(rating);
-            });
-        }
-    });
-    
+    history.forEach(entry => { if (entry.blockRatingMap) Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => { if (!blockRatingsAggregate[blockIdx]) blockRatingsAggregate[blockIdx] = { sum: 0, count: 0 }; blockRatingsAggregate[blockIdx].sum += rating; blockRatingsAggregate[blockIdx].count++; }); });
     const blockLabels = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => `Block ${parseInt(idx) + 1}`);
     const avgRatings = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => (blockRatingsAggregate[idx].sum / blockRatingsAggregate[idx].count).toFixed(1));
-    const minRatings = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => Math.min(...blockRatingsAggregate[idx].ratings));
-    const maxRatings = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => Math.max(...blockRatingsAggregate[idx].ratings));
-    
     if (blockRatingsChart) blockRatingsChart.destroy();
-    blockRatingsChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: blockLabels, datasets: [
-            { label: 'Average Rating', data: avgRatings, backgroundColor: '#1B4D3E', borderRadius: 8, yAxisID: 'y' },
-            { label: 'Minimum Rating', data: minRatings, backgroundColor: '#EF4444', borderRadius: 8, yAxisID: 'y' },
-            { label: 'Maximum Rating', data: maxRatings, backgroundColor: '#10B981', borderRadius: 8, yAxisID: 'y' }
-        ] },
-        options: { responsive: true, maintainAspectRatio: true, scales: { y: { title: { display: true, text: 'Rating (/10)' }, min: 0, max: 10, ticks: { stepSize: 1 } }, x: { title: { display: true, text: 'Work Blocks' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}/10` } } } }
-    });
-    
-    const hardestBlock = avgRatings.reduce((minIdx, rating, idx, arr) => rating < arr[minIdx] ? idx : minIdx, 0);
-    const easiestBlock = avgRatings.reduce((maxIdx, rating, idx, arr) => rating > arr[maxIdx] ? idx : maxIdx, 0);
-    
-    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Productivity Analysis:</strong><br>
-    • <strong>Lowest Productivity Block:</strong> ${blockLabels[hardestBlock]} (Avg: ${avgRatings[hardestBlock]}/10)<br>
-    • <strong>Highest Productivity Block:</strong> ${blockLabels[easiestBlock]} (Avg: ${avgRatings[easiestBlock]}/10)<br>
-    • <strong>Insight:</strong> ${avgRatings[hardestBlock] < 5 ? 'Consider optimizing your workflow in low-productivity blocks.' : avgRatings[hardestBlock] > 8 ? 'Excellent! You\'re maintaining high productivity across blocks!' : 'Work on balancing productivity levels across all blocks.'}`;
+    blockRatingsChart = new Chart(ctx, { type: 'bar', data: { labels: blockLabels, datasets: [{ label: 'Average Rating', data: avgRatings, backgroundColor: '#1B4D3E', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { min: 0, max: 10 } } } });
+    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Productivity Analysis:</strong> See which blocks are your most and least productive.`;
+}
+
+function loadDistractionChart() {
+    const history = getHistory();
+    const ctx = document.getElementById('distractionChart').getContext('2d');
+    if (history.length === 0) { document.getElementById('distraction-insight').innerHTML = '📭 No distraction data available.'; if (distractionChart) distractionChart.destroy(); return; }
+    const distractionFreq = {};
+    let totalDistractions = 0;
+    history.forEach(entry => { if (entry.distractions) Object.values(entry.distractions).forEach(distList => { distList.forEach(d => { distractionFreq[d.distractionType] = (distractionFreq[d.distractionType] || 0) + 1; totalDistractions++; }); }); });
+    if (totalDistractions === 0) { document.getElementById('distraction-insight').innerHTML = '📭 No distractions logged yet.'; if (distractionChart) distractionChart.destroy(); return; }
+    const sorted = Object.entries(distractionFreq).sort((a, b) => b[1] - a[1]);
+    const labels = sorted.map(([type]) => type.length > 20 ? type.substring(0, 18) + '...' : type);
+    const data = sorted.map(([, count]) => count);
+    if (distractionChart) distractionChart.destroy();
+    distractionChart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Frequency', data, backgroundColor: '#F59E0B', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { ticks: { stepSize: 1 } } } } });
+    const topDistraction = sorted[0];
+    document.getElementById('distraction-insight').innerHTML = `🚫 <strong>Distraction Analysis:</strong> Most common: ${topDistraction[0]} (${topDistraction[1]} times). Total: ${totalDistractions} distractions.`;
 }
 
 // ============================================
@@ -1075,12 +856,8 @@ function loadBlockRatingsChart() {
 function requestNotificationPermission() {
     if (!("Notification" in window)) { showAlert("❌ Your browser doesn't support desktop notifications", "error"); return; }
     if (Notification.permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications already enabled!", "success"); showReminderSettings(); return; }
-    if (Notification.permission !== "denied") {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications enabled!", "success"); showReminderSettings(); setupReminderSystem(); }
-            else showAlert("⚠️ Notification permission denied.", "error");
-        });
-    } else showAlert("🔕 Notifications are blocked.", "error");
+    if (Notification.permission !== "denied") Notification.requestPermission().then(permission => { if (permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications enabled!", "success"); showReminderSettings(); setupReminderSystem(); } else showAlert("⚠️ Notification permission denied.", "error"); });
+    else showAlert("🔕 Notifications are blocked.", "error");
 }
 
 function showReminderSettings() { const card = document.getElementById("reminder-settings"); if(card) card.style.display = "block"; loadReminderSettings(); }
@@ -1091,11 +868,9 @@ function loadReminderSettings() {
     document.getElementById("weekly-report-toggle").checked = localStorage.getItem("weeklyReportEnabled") === "true";
     document.getElementById("nudge-toggle").checked = localStorage.getItem("nudgeEnabled") === "true";
     document.getElementById("reminder-time").value = localStorage.getItem("reminderTime") || "20:00";
-    if (daily) scheduleDailyReminder(document.getElementById("reminder-time").value);
 }
 function toggleDailyReminder() { localStorage.setItem("dailyReminderEnabled", document.getElementById("daily-reminder-toggle").checked); }
 function saveReminderTime() { localStorage.setItem("reminderTime", document.getElementById("reminder-time").value); }
-function scheduleDailyReminder(time) { if (reminderCheckInterval) clearInterval(reminderCheckInterval); }
 function toggleWeeklyReport() { localStorage.setItem("weeklyReportEnabled", document.getElementById("weekly-report-toggle").checked); }
 function toggleNudge() { localStorage.setItem("nudgeEnabled", document.getElementById("nudge-toggle").checked); }
 function setupReminderSystem() {}
@@ -1115,10 +890,7 @@ window.saveBlockRatings = saveBlockRatings;
 window.closeRatingModal = closeRatingModal;
 window.closeRatingsModal = closeRatingsModal;
 window.showAllRatingsModal = showAllRatingsModal;
-window.finalizeBlockAssignments = finalizeBlockAssignments;
 window.resetAllBlockAssignments = resetAllBlockAssignments;
-window.renderBlockAssignmentUI = renderBlockAssignmentUI;
-window.parseAndUpdateBlockTimes = parseAndUpdateBlockTimes;
 window.toggleTheme = toggleTheme;
 window.setMood = setMood;
 window.addTask = addTask;
@@ -1140,6 +912,13 @@ window.toggleDailyReminder = toggleDailyReminder;
 window.saveReminderTime = saveReminderTime;
 window.toggleWeeklyReport = toggleWeeklyReport;
 window.toggleNudge = toggleNudge;
+window.addSelectedDistraction = addSelectedDistraction;
+window.addCustomDistraction = addCustomDistraction;
+window.removeDistraction = removeDistraction;
+window.toggleCustomInput = toggleCustomInput;
+window.showDistractionInsightsModal = showDistractionInsightsModal;
+window.closeDistractionInsightsModal = closeDistractionInsightsModal;
+window.handleDistractionSelectChange = handleDistractionSelectChange;
 
 // ============================================
 // INITIALIZATION
