@@ -137,11 +137,14 @@
                 </div>
 
                 <div class="form-section">
-                    <label class="form-label">Rate your expected productivity</label>
-                    <div class="rating-wrapper">
-                        <input type="range" id="productivity" class="range-slider" min="1" max="10" value="7">
-                        <span id="rating-value" class="rating-display">7</span><span class="rating-max">/10</span>
+                    <label class="form-label">Overall Daily Productivity Score <span style="font-size:0.85rem; color:var(--text-muted);">(Auto-calculated from block ratings)</span></label>
+                    <div class="rating-wrapper" style="justify-content: center; background: var(--bg-light); padding: 16px; border-radius: 12px;">
+                        <span id="auto-productivity-score" class="rating-display" style="font-size: 2.8rem; color: var(--primary);">—</span>
+                        <span class="rating-max" style="font-size: 1.4rem;">/10</span>
                     </div>
+                    <small id="score-breakdown" style="display: block; text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.85rem;">
+                        Score appears after rating completed blocks
+                    </small>
                 </div>
 
                 <div class="form-section">
@@ -158,7 +161,7 @@
                     <div class="summary-item"><span class="summary-label">Tasks</span><p id="sum-tasks" class="summary-value"></p></div>
                     <div class="summary-item"><span class="summary-label">Work Duration</span><p id="sum-hours" class="summary-value"></p></div>
                     <div class="summary-item"><span class="summary-label">Blocks</span><p class="summary-value"><span id="sum-blocks"></span> × <span id="sum-per-block"></span>h</p></div>
-                    <div class="summary-item"><span class="summary-label">Productivity Goal</span><p id="sum-rating" class="summary-value"></p></div>
+                    <div class="summary-item"><span class="summary-label">Productivity Score</span><p id="sum-rating" class="summary-value"></p></div>
                 </div>
                 <div class="summary-blocks"><span class="summary-label">Block Schedule</span><p id="sum-block-tasks" class="summary-value"></p></div>
                 <div class="summary-blocks"><span class="summary-label">Block Task Assignment & Ratings</span><p id="sum-block-assignment" class="summary-value"></p></div>

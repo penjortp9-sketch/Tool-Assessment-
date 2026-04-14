@@ -127,11 +127,6 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.2); }
-}
-
 /* Theme Toggle Button */
 .theme-toggle-btn {
     transition: var(--transition);
@@ -594,7 +589,7 @@ body {
     flex: 1;
     height: 8px;
     -webkit-appearance: none;
-    appearance: none;  /* ← ADD THIS LINE */
+    appearance: none;
     background: var(--border-color);
     border-radius: 4px;
     outline: none;
@@ -924,33 +919,6 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.heatmap-day .day-date {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    margin-top: 4px;
-}
-
-.heatmap-legend {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 15px;
-    flex-wrap: wrap;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.8rem;
-}
-
-.legend-color {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-}
-
 .productivity-1 { background: #FEE2E2; color: #991B1B; }
 .productivity-2 { background: #FEE2E2; color: #991B1B; }
 .productivity-3 { background: #FED7AA; color: #9A3412; }
@@ -1021,7 +989,6 @@ body {
 }
 
 .history-date { display: flex; flex-direction: column; gap: 2px; }
-.date-day { font-weight: 700; color: var(--primary); font-size: 0.9rem; }
 .date-full { font-weight: 600; color: var(--text-dark); }
 .date-time { font-size: 0.85rem; color: var(--text-muted); }
 .history-mood { font-size: 1.8rem; }

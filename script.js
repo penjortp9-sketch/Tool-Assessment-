@@ -3,6 +3,7 @@
 // INCLUDING DARK/LIGHT MODE TOGGLE & BLOCK ASSIGNMENT WITH RATINGS
 // UPDATED: Ratings only available AFTER block completion
 // UPDATED: Auto-generate blocks with editable time per block
+// UPDATED: Productivity score auto-calculated from block ratings
 // ============================================
 
 // State Management
@@ -100,49 +101,42 @@ function setMood(mood, btn) {
     if (navigator.vibrate) navigator.vibrate(50);
 }
 
-// Task Management
-function addTask() {
-    const input = document.getElementById('task-input');
-    const val = input.value.trim();
-    if (val) {
-        taskList.push(val);
-        updateTaskListUI();
-        input.value = '';
-        input.focus();
-        document.getElementById('tasks').value = taskList.join(', ');
-        renderBlockAssignmentUI();
-        blockAssignmentFinished = false;
-        document.getElementById('assignmentStatusMsg').innerHTML = '';
+// ============================================
+// AUTO-CALCULATED PRODUCTIVITY SCORE
+// ============================================
+
+function calculateAutoProductivityScore() {
+    const ratedBlocks = Object.keys(blockRatingMap).filter(idx => blockCompletionStatus[idx] === true);
+    if (ratedBlocks.length === 0) {
+        return null;
     }
-}
-
-function updateTaskListUI() {
-    const list = document.getElementById('task-checklist');
-    list.innerHTML = taskList.map((t, i) => `<li><span>${escapeHtml(t)}</span><span class="delete-task" onclick="removeTask(${i})">✕</span></li>`).join('');
-}
-
-function removeTask(index) {
-    taskList.splice(index, 1);
-    updateTaskListUI();
-    document.getElementById('tasks').value = taskList.join(', ');
-    renderBlockAssignmentUI();
-    blockAssignmentFinished = false;
-    document.getElementById('assignmentStatusMsg').innerHTML = '';
-}
-
-// Get block name by index (removes time part for display)
-function getBlockNameByIndex(idx) {
-    const blockTasksRaw = document.getElementById('block-tasks').value;
-    if (!blockTasksRaw) return `Block ${idx+1}`;
-    const parts = blockTasksRaw.split(',').map(s => s.trim());
-    if (parts[idx]) {
-        return parts[idx].replace(/\s*\([\d.]+\s*h?\)/, '').trim();
+    
+    let totalRating = 0;
+    for (let idx of ratedBlocks) {
+        totalRating += blockRatingMap[idx];
     }
-    return `Block ${idx+1}`;
+    
+    const averageRating = totalRating / ratedBlocks.length;
+    return Math.round(averageRating * 10) / 10;
+}
+
+function updateAutoProductivityDisplay() {
+    const score = calculateAutoProductivityScore();
+    const scoreSpan = document.getElementById('auto-productivity-score');
+    const breakdownSpan = document.getElementById('score-breakdown');
+    const ratedBlocks = Object.keys(blockRatingMap).filter(idx => blockCompletionStatus[idx] === true);
+    
+    if (score !== null && ratedBlocks.length > 0) {
+        scoreSpan.textContent = score.toFixed(1);
+        breakdownSpan.innerHTML = `✨ Based on ${ratedBlocks.length} rated block${ratedBlocks.length !== 1 ? 's' : ''} | Average rating: ${score.toFixed(1)}/10`;
+    } else {
+        scoreSpan.textContent = '—';
+        breakdownSpan.innerHTML = 'Complete and rate blocks to see your productivity score';
+    }
 }
 
 // ============================================
-// IMPROVED AUTO GENERATE BLOCKS WITH EDITABLE TIME  ← NEW FEATURE
+// AUTO GENERATE BLOCKS WITH EDITABLE TIME
 // ============================================
 
 function autoGenerateBlocksManual() {
@@ -173,9 +167,9 @@ function autoGenerateBlocksManual() {
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     renderBlockAssignmentUI();
+    updateAutoProductivityDisplay();
 }
 
-// NEW: Allow manual editing of time in block input and normalize
 function parseAndUpdateBlockTimes() {
     const blockInput = document.getElementById('block-tasks').value.trim();
     if (!blockInput) return;
@@ -201,7 +195,7 @@ function parseAndUpdateBlockTimes() {
 }
 
 // ============================================
-// BLOCK ASSIGNMENT & RATING SYSTEM (Unchanged)
+// BLOCK ASSIGNMENT & RATING SYSTEM
 // ============================================
 
 function markBlockCompleted(blockIdx) {
@@ -223,6 +217,7 @@ function markBlockCompleted(blockIdx) {
     
     renderBlockAssignmentUI();
     updateRatingSummary();
+    updateAutoProductivityDisplay();
 }
 
 function renderBlockAssignmentUI() {
@@ -273,6 +268,7 @@ function renderBlockAssignmentUI() {
             delete blockRatingMap[blockIdx];
             updateRatingSummary();
             renderBlockAssignmentUI();
+            updateAutoProductivityDisplay();
         });
     });
     
@@ -359,6 +355,7 @@ function saveBlockRating(blockIdx) {
         showAlert(`✅ Rating saved for Block ${blockIdx + 1}: ${rating}/10`, "success");
         closeRatingModal();
         renderBlockAssignmentUI();
+        updateAutoProductivityDisplay();
     }
 }
 
@@ -432,6 +429,7 @@ function resetAllBlockAssignments() {
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
         renderBlockAssignmentUI();
+        updateAutoProductivityDisplay();
         showAlert('🔄 All block assignments and ratings have been reset', 'success');
     }
 }
@@ -471,9 +469,50 @@ function finalizeBlockAssignments() {
     }
     
     blockAssignmentFinished = true;
-    document.getElementById('assignmentStatusMsg').innerHTML = '✅ Block assignments finalized! You can now rate productivity.';
-    showAlert("✅ Great! Block tasks assigned. You can now rate your expected productivity.", "success");
+    document.getElementById('assignmentStatusMsg').innerHTML = '✅ Block assignments finalized! Productivity score calculated.';
+    showAlert("✅ Great! Block tasks assigned. Your productivity score has been calculated.", "success");
     return true;
+}
+
+function getBlockNameByIndex(idx) {
+    const blockTasksRaw = document.getElementById('block-tasks').value;
+    if (!blockTasksRaw) return `Block ${idx+1}`;
+    const parts = blockTasksRaw.split(',').map(s => s.trim());
+    if (parts[idx]) {
+        return parts[idx].replace(/\s*\([\d.]+\s*h?\)/, '').trim();
+    }
+    return `Block ${idx+1}`;
+}
+
+// Task Management
+function addTask() {
+    const input = document.getElementById('task-input');
+    const val = input.value.trim();
+    if (val) {
+        taskList.push(val);
+        updateTaskListUI();
+        input.value = '';
+        input.focus();
+        document.getElementById('tasks').value = taskList.join(', ');
+        renderBlockAssignmentUI();
+        blockAssignmentFinished = false;
+        document.getElementById('assignmentStatusMsg').innerHTML = '';
+    }
+}
+
+function updateTaskListUI() {
+    const list = document.getElementById('task-checklist');
+    list.innerHTML = taskList.map((t, i) => `<li><span>${escapeHtml(t)}</span><span class="delete-task" onclick="removeTask(${i})">✕</span></li>`).join('');
+}
+
+function removeTask(index) {
+    taskList.splice(index, 1);
+    updateTaskListUI();
+    document.getElementById('tasks').value = taskList.join(', ');
+    renderBlockAssignmentUI();
+    blockAssignmentFinished = false;
+    document.getElementById('assignmentStatusMsg').innerHTML = '';
+    updateAutoProductivityDisplay();
 }
 
 // Login/Logout
@@ -502,9 +541,9 @@ function logout() {
     blockRatingMap = {};
     blockCompletionStatus = {};
     blockAssignmentFinished = false;
+    updateAutoProductivityDisplay();
 }
 
-// Setup event listeners for block count and hours + NEW editable time
 function setupEventListeners() {
     const blocksInput = document.getElementById('blocks');
     const hoursInput = document.getElementById('total-hours');
@@ -513,14 +552,12 @@ function setupEventListeners() {
     if (blocksInput) blocksInput.addEventListener('change', autoGenerateBlocksManual);
     if (hoursInput) hoursInput.addEventListener('change', autoGenerateBlocksManual);
     
-    // NEW: Listen to manual edits in block time
     if (blockTasksInput) {
         blockTasksInput.addEventListener('change', parseAndUpdateBlockTimes);
         blockTasksInput.addEventListener('blur', parseAndUpdateBlockTimes);
     }
 }
 
-// Alert system
 function showAlert(msg, type = "info") {
     const alertDiv = document.createElement('div');
     alertDiv.style.cssText = `
@@ -538,7 +575,6 @@ function showAlert(msg, type = "info") {
 function saveEntry() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     
-    // Validate all blocks are assigned and completed
     const missingBlocks = [];
     const uncompletedBlocks = [];
     for (let i = 0; i < blocksCount; i++) {
@@ -556,6 +592,9 @@ function saveEntry() {
         return;
     }
     
+    const autoScore = calculateAutoProductivityScore();
+    const finalProductivity = autoScore !== null ? autoScore : 5;
+    
     const entry = {
         timestamp: new Date().toISOString(),
         date: new Date().toLocaleDateString('en-GB'),
@@ -566,7 +605,7 @@ function saveEntry() {
         blockRatingsData: { ...blockRatingMap },
         blockAssignmentData: { ...blockAssignmentMap },
         blockCompletionData: { ...blockCompletionStatus },
-        productivity: parseInt(document.getElementById('productivity').value),
+        productivity: finalProductivity,
         comments: document.getElementById('comments').value
     };
     
@@ -574,7 +613,7 @@ function saveEntry() {
     history.push(entry);
     localStorage.setItem('productivity_history', JSON.stringify(history));
     
-    showAlert('✅ Entry saved successfully!', 'success');
+    showAlert(`✅ Entry saved successfully! Productivity score: ${finalProductivity}/10`, 'success');
     resetForm();
 }
 
@@ -587,8 +626,6 @@ function resetForm() {
     document.getElementById('tasks').value = '';
     document.getElementById('total-hours').value = '6';
     document.getElementById('blocks').value = '3';
-    document.getElementById('productivity').value = '7';
-    document.getElementById('rating-value').textContent = '7';
     document.getElementById('comments').value = '';
     blockAssignmentMap = {};
     blockRatingMap = {};
@@ -596,9 +633,9 @@ function resetForm() {
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
     setTimeout(() => autoGenerateBlocksManual(), 100);
+    updateAutoProductivityDisplay();
 }
 
-// Get history
 function getHistory() {
     const stored = localStorage.getItem('productivity_history');
     return stored ? JSON.parse(stored) : [];
@@ -663,7 +700,7 @@ function displayHistory() {
         return;
     }
     
-    list.innerHTML = history.reverse().map((entry, idx) => `
+    list.innerHTML = history.slice().reverse().map((entry, idx) => `
         <div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})">
             <div class="history-item-header">
                 <div class="history-date">
@@ -979,5 +1016,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.finalizeBlockAssignments = finalizeBlockAssignments;
     window.resetAllBlockAssignments = resetAllBlockAssignments;
     window.showAllRatingsModal = showAllRatingsModal;
-    window.parseAndUpdateBlockTimes = parseAndUpdateBlockTimes;   // ← New function exposed
+    window.parseAndUpdateBlockTimes = parseAndUpdateBlockTimes;
+    updateAutoProductivityDisplay();
 });
