@@ -24,6 +24,9 @@ let blockAssignmentFinished = false;
 // Distraction Tracker State
 let distractionLogs = {};
 
+// NEW: Permanent backup for CSV download (survives Clear All)
+let permanentHistoryBackup = [];
+
 // Predefined distraction types
 const distractionTypes = [
     { value: "📱 Social Media", label: "📱 Social Media" },
@@ -637,6 +640,10 @@ function saveEntry() {
     let history = getHistory();
     history.push(entry);
     localStorage.setItem('productivity_history', JSON.stringify(history));
+
+    // Update permanent backup
+    permanentHistoryBackup = [...history];
+
     showAlert(`✅ Entry saved successfully! Productivity score: ${finalProductivity}/10`, 'success');
     resetForm();
 }
@@ -662,7 +669,10 @@ function resetForm() {
     updateDistractionPatterns();
 }
 
-function getHistory() { const stored = localStorage.getItem('productivity_history'); return stored ? JSON.parse(stored) : []; }
+function getHistory() { 
+    const stored = localStorage.getItem('productivity_history'); 
+    return stored ? JSON.parse(stored) : []; 
+}
 
 // ============================================
 // HISTORY SCREEN
@@ -673,6 +683,7 @@ function showHistoryScreen() {
     document.getElementById('history-screen').classList.remove('hidden'); 
     loadHistoryData(); 
 }
+
 function backToDashboard() { 
     document.getElementById('history-screen').classList.add('hidden'); 
     document.getElementById('main-screen').classList.remove('hidden'); 
@@ -681,6 +692,12 @@ function backToDashboard() {
 function loadHistoryData() {
     const history = getHistory();
     filteredHistoryData = history;
+
+    // Keep permanent backup updated
+    if (history.length > 0) {
+        permanentHistoryBackup = [...history];
+    }
+
     displayStats();
     displayHistory();
     loadProductivityTrendChart();
@@ -693,7 +710,10 @@ function loadHistoryData() {
 
 function displayStats() {
     const history = filteredHistoryData;
-    if (history.length === 0) { document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No data yet. Start logging your productivity!</p></div>'; return; }
+    if (history.length === 0) { 
+        document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No data yet. Start logging your productivity!</p></div>'; 
+        return; 
+    }
     const totalEntries = history.length;
     const avgProductivity = (history.reduce((sum, h) => sum + (parseInt(h.productivity) || 0), 0) / totalEntries).toFixed(1);
     const totalHours = history.reduce((sum, h) => sum + (parseFloat(h.totalHours) || 0), 0).toFixed(1);
@@ -703,12 +723,19 @@ function displayStats() {
     document.getElementById('statsGrid').innerHTML = `<div class="stat-card"><div class="stat-label">📊 Total Entries</div><div class="stat-value">${totalEntries}</div></div><div class="stat-card"><div class="stat-label">⭐ Avg Productivity</div><div class="stat-value">${avgProductivity}/10</div></div><div class="stat-card"><div class="stat-label">⏱️ Total Hours</div><div class="stat-value">${totalHours}h</div></div><div class="stat-card"><div class="stat-label">😊 Mood</div><div class="stat-value">${mostFrequentMood}</div></div><div class="stat-card"><div class="stat-label">🚫 Distractions</div><div class="stat-value">${totalDistractions}</div></div>`;
 }
 
-function getMostFrequent(arr) { const counts = {}; arr.forEach(item => counts[item] = (counts[item] || 0) + 1); return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b); }
+function getMostFrequent(arr) { 
+    const counts = {}; 
+    arr.forEach(item => counts[item] = (counts[item] || 0) + 1); 
+    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b); 
+}
 
 function displayHistory() {
     const history = filteredHistoryData;
     const list = document.getElementById('history-list');
-    if (history.length === 0) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>'; return; }
+    if (history.length === 0) { 
+        list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No entries found. Start tracking your productivity!</p></div>'; 
+        return; 
+    }
     list.innerHTML = history.slice().reverse().map((entry, idx) => {
         let distractionCount = 0;
         if (entry.distractions) Object.values(entry.distractions).forEach(distList => distractionCount += distList.length);
@@ -749,6 +776,7 @@ function showEntryDetail(idx) {
 }
 
 function closeDetailModal() { document.getElementById('detail-modal').classList.add('hidden'); }
+
 function filterHistory() {
     const moodFilter = document.getElementById('mood-filter').value;
     const productivityFilter = document.getElementById('productivity-filter').value;
@@ -763,29 +791,43 @@ function filterHistory() {
     });
     displayHistory();
 }
-function resetFilters() { document.getElementById('mood-filter').value = ''; document.getElementById('productivity-filter').value = ''; filteredHistoryData = getHistory(); displayHistory(); }
-function clearAllHistory() { if (confirm('⚠️ Are you sure? This will delete all productivity entries permanently!')) { localStorage.removeItem('productivity_history'); showAlert('🗑️ All history cleared', 'success'); loadHistoryData(); } }
+
+function resetFilters() { 
+    document.getElementById('mood-filter').value = ''; 
+    document.getElementById('productivity-filter').value = ''; 
+    filteredHistoryData = getHistory(); 
+    displayHistory(); 
+}
+
+function clearAllHistory() {
+    if (confirm('⚠️ Are you sure? This will clear history from the app, but your backup will still be available for CSV download.')) {
+        localStorage.removeItem('productivity_history');
+        filteredHistoryData = [];
+        showAlert('🗑️ History cleared from app. Backup preserved for download.', 'success');
+        loadHistoryData();
+    }
+}
 
 // ============================================
-// UPDATED DOWNLOAD CSV - Distractions as words (not count)
+// DOWNLOAD CSV - Uses permanent backup
 // ============================================
 
 function downloadHistoryCSV() {
-    const history = getHistory();
-    if (history.length === 0) {
+    const historyToDownload = permanentHistoryBackup.length > 0 ? permanentHistoryBackup : getHistory();
+
+    if (historyToDownload.length === 0) {
         showAlert("No history data to download", "warning");
         return;
     }
 
     let csvContent = "Date,Time,Mood,Productivity (/10),Total Hours,Blocks,Tasks,Distractions,Comments\n";
 
-    history.forEach(entry => {
+    historyToDownload.forEach(entry => {
         let moodText = entry.mood;
         if (moodText === "🔥") moodText = "Focused";
         else if (moodText === "😊") moodText = "Happy";
         else if (moodText === "😴") moodText = "Tired";
 
-        // Build distraction text (actual names, not count)
         let distractionText = "None";
         if (entry.distractions && Object.keys(entry.distractions).length > 0) {
             let allDist = [];
@@ -793,7 +835,6 @@ function downloadHistoryCSV() {
                 const distList = entry.distractions[blockIdx];
                 distList.forEach(d => {
                     let cleanDist = d.distractionType || d.customText || "Other";
-                    // Clean emojis to words
                     cleanDist = cleanDist.replace(/📱/g, "Social Media")
                                        .replace(/📧/g, "Email")
                                        .replace(/📞/g, "Phone Call")
@@ -830,13 +871,13 @@ function downloadHistoryCSV() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `Chimla_Tabdew_History_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("download", `Chimla_Tabdew_Full_History_${new Date().toISOString().slice(0,10)}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    showAlert("✅ History downloaded as CSV successfully!", "success");
+    showAlert("✅ Full history downloaded successfully!", "success");
 }
 
 // ============================================
@@ -853,34 +894,80 @@ function switchChartTab(tab, event) {
 function loadProductivityTrendChart() {
     const history = getHistory();
     const ctx = document.getElementById('productivityTrendChart').getContext('2d');
-    if (history.length === 0) { document.getElementById('trend-insight').innerHTML = '📭 No data available.'; if (productivityChart) productivityChart.destroy(); return; }
+    if (history.length === 0) { 
+        document.getElementById('trend-insight').innerHTML = '📭 No data available.'; 
+        if (productivityChart) productivityChart.destroy(); 
+        return; 
+    }
     const labels = history.map(h => h.date);
     const data = history.map(h => parseInt(h.productivity));
     const avgProductivity = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
     if (productivityChart) productivityChart.destroy();
-    productivityChart = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'Productivity Rating', data, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', tension: 0.4, pointRadius: 6, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', pointBorderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } } } });
+    productivityChart = new Chart(ctx, { 
+        type: 'line', 
+        data: { 
+            labels, 
+            datasets: [{ 
+                label: 'Productivity Rating', 
+                data, 
+                borderColor: '#1B4D3E', 
+                backgroundColor: 'rgba(27, 77, 62, 0.1)', 
+                tension: 0.4, 
+                pointRadius: 6, 
+                pointBackgroundColor: '#1B4D3E', 
+                pointBorderColor: '#fff', 
+                pointBorderWidth: 2 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: true, 
+            scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } } 
+        } 
+    });
     document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>. ${avgProductivity >= 8 ? 'Excellent consistency! 🎉' : avgProductivity >= 6 ? 'Good progress, keep it up!' : 'Room for improvement.'}`;
 }
 
 function loadMoodDistributionChart() {
     const history = getHistory();
     const ctx = document.getElementById('moodDistributionChart').getContext('2d');
-    if (history.length === 0) { document.getElementById('mood-insight').innerHTML = '📭 No data available.'; if (moodChart) moodChart.destroy(); return; }
+    if (history.length === 0) { 
+        document.getElementById('mood-insight').innerHTML = '📭 No data available.'; 
+        if (moodChart) moodChart.destroy(); 
+        return; 
+    }
     const moodCounts = {};
     history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
     if (moodChart) moodChart.destroy();
-    moodChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(moodCounts), datasets: [{ data: Object.values(moodCounts), backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8 }] }, options: { responsive: true } });
+    moodChart = new Chart(ctx, { 
+        type: 'doughnut', 
+        data: { 
+            labels: Object.keys(moodCounts), 
+            datasets: [{ 
+                data: Object.values(moodCounts), 
+                backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], 
+                borderRadius: 8 
+            }] 
+        }, 
+        options: { responsive: true } 
+    });
     document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Insight:</strong> Your dominant mood is <strong>${getMostFrequent(history.map(h => h.mood))}</strong>.`;
 }
 
 function loadHeatmapChart() {
     const history = getHistory();
     const container = document.getElementById('heatmap-calendar');
-    if (history.length === 0) { document.getElementById('heatmap-insight').innerHTML = '📭 No data available.'; return; }
+    if (history.length === 0) { 
+        document.getElementById('heatmap-insight').innerHTML = '📭 No data available.'; 
+        return; 
+    }
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     const entryMap = {};
-    history.forEach(entry => { const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB'); entryMap[date] = parseInt(entry.productivity); });
+    history.forEach(entry => { 
+        const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB'); 
+        entryMap[date] = parseInt(entry.productivity); 
+    });
     let html = '<div class="heatmap-calendar">';
     let currentDate = new Date(thirtyDaysAgo);
     while (currentDate <= today) {
@@ -897,39 +984,123 @@ function loadHeatmapChart() {
 function loadCorrelationChart() {
     const history = getHistory();
     const ctx = document.getElementById('correlationChart').getContext('2d');
-    if (history.length === 0) { document.getElementById('correlation-insight').innerHTML = '📭 No data available.'; if (correlationChart) correlationChart.destroy(); return; }
-    const scatterData = history.map(entry => ({ x: parseFloat(entry.totalHours), y: parseInt(entry.productivity), mood: entry.mood }));
+    if (history.length === 0) { 
+        document.getElementById('correlation-insight').innerHTML = '📭 No data available.'; 
+        if (correlationChart) correlationChart.destroy(); 
+        return; 
+    }
+    const scatterData = history.map(entry => ({ 
+        x: parseFloat(entry.totalHours), 
+        y: parseInt(entry.productivity), 
+        mood: entry.mood 
+    }));
     if (correlationChart) correlationChart.destroy();
-    correlationChart = new Chart(ctx, { type: 'scatter', data: { datasets: [{ label: 'Entries', data: scatterData, backgroundColor: '#1B4D3E', pointRadius: 8 }] }, options: { responsive: true, scales: { x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12 }, y: { title: { display: true, text: 'Productivity (/10)' }, min: 0, max: 10 } } } });
+    correlationChart = new Chart(ctx, { 
+        type: 'scatter', 
+        data: { 
+            datasets: [{ 
+                label: 'Entries', 
+                data: scatterData, 
+                backgroundColor: '#1B4D3E', 
+                pointRadius: 8 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            scales: { 
+                x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12 }, 
+                y: { title: { display: true, text: 'Productivity (/10)' }, min: 0, max: 10 } 
+            } 
+        } 
+    });
     document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> Track your hours vs productivity to find your optimal work duration.`;
 }
 
 function loadBlockRatingsChart() {
     const history = getHistory();
     const ctx = document.getElementById('blockRatingsChart').getContext('2d');
-    if (history.length === 0 || !history.some(h => h.blockRatingMap && Object.keys(h.blockRatingMap).length > 0)) { document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available.'; if (blockRatingsChart) blockRatingsChart.destroy(); return; }
+    if (history.length === 0 || !history.some(h => h.blockRatingMap && Object.keys(h.blockRatingMap).length > 0)) { 
+        document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available.'; 
+        if (blockRatingsChart) blockRatingsChart.destroy(); 
+        return; 
+    }
     const blockRatingsAggregate = {};
-    history.forEach(entry => { if (entry.blockRatingMap) Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => { if (!blockRatingsAggregate[blockIdx]) blockRatingsAggregate[blockIdx] = { sum: 0, count: 0 }; blockRatingsAggregate[blockIdx].sum += rating; blockRatingsAggregate[blockIdx].count++; }); });
+    history.forEach(entry => { 
+        if (entry.blockRatingMap) {
+            Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => { 
+                if (!blockRatingsAggregate[blockIdx]) blockRatingsAggregate[blockIdx] = { sum: 0, count: 0 }; 
+                blockRatingsAggregate[blockIdx].sum += rating; 
+                blockRatingsAggregate[blockIdx].count++; 
+            }); 
+        }
+    });
     const blockLabels = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => `Block ${parseInt(idx) + 1}`);
     const avgRatings = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => (blockRatingsAggregate[idx].sum / blockRatingsAggregate[idx].count).toFixed(1));
     if (blockRatingsChart) blockRatingsChart.destroy();
-    blockRatingsChart = new Chart(ctx, { type: 'bar', data: { labels: blockLabels, datasets: [{ label: 'Average Rating', data: avgRatings, backgroundColor: '#1B4D3E', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { min: 0, max: 10 } } } });
+    blockRatingsChart = new Chart(ctx, { 
+        type: 'bar', 
+        data: { 
+            labels: blockLabels, 
+            datasets: [{ 
+                label: 'Average Rating', 
+                data: avgRatings, 
+                backgroundColor: '#1B4D3E', 
+                borderRadius: 8 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            scales: { y: { min: 0, max: 10 } } 
+        } 
+    });
     document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Productivity Analysis:</strong> See which blocks are your most and least productive.`;
 }
 
 function loadDistractionChart() {
     const history = getHistory();
     const ctx = document.getElementById('distractionChart').getContext('2d');
-    if (history.length === 0) { document.getElementById('distraction-insight').innerHTML = '📭 No distraction data available.'; if (distractionChart) distractionChart.destroy(); return; }
+    if (history.length === 0) { 
+        document.getElementById('distraction-insight').innerHTML = '📭 No distraction data available.'; 
+        if (distractionChart) distractionChart.destroy(); 
+        return; 
+    }
     const distractionFreq = {};
     let totalDistractions = 0;
-    history.forEach(entry => { if (entry.distractions) Object.values(entry.distractions).forEach(distList => { distList.forEach(d => { distractionFreq[d.distractionType] = (distractionFreq[d.distractionType] || 0) + 1; totalDistractions++; }); }); });
-    if (totalDistractions === 0) { document.getElementById('distraction-insight').innerHTML = '📭 No distractions logged yet.'; if (distractionChart) distractionChart.destroy(); return; }
+    history.forEach(entry => { 
+        if (entry.distractions) {
+            Object.values(entry.distractions).forEach(distList => { 
+                distList.forEach(d => { 
+                    distractionFreq[d.distractionType] = (distractionFreq[d.distractionType] || 0) + 1; 
+                    totalDistractions++; 
+                }); 
+            }); 
+        }
+    });
+    if (totalDistractions === 0) { 
+        document.getElementById('distraction-insight').innerHTML = '📭 No distractions logged yet.'; 
+        if (distractionChart) distractionChart.destroy(); 
+        return; 
+    }
     const sorted = Object.entries(distractionFreq).sort((a, b) => b[1] - a[1]);
     const labels = sorted.map(([type]) => type.length > 20 ? type.substring(0, 18) + '...' : type);
     const data = sorted.map(([, count]) => count);
     if (distractionChart) distractionChart.destroy();
-    distractionChart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Frequency', data, backgroundColor: '#F59E0B', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { ticks: { stepSize: 1 } } } } });
+    distractionChart = new Chart(ctx, { 
+        type: 'bar', 
+        data: { 
+            labels, 
+            datasets: [{ 
+                label: 'Frequency', 
+                data, 
+                backgroundColor: '#F59E0B', 
+                borderRadius: 8 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            scales: { y: { ticks: { stepSize: 1 } } } 
+        } 
+    });
     const topDistraction = sorted[0];
     document.getElementById('distraction-insight').innerHTML = `🚫 <strong>Distraction Analysis:</strong> Most common: ${topDistraction[0]} (${topDistraction[1]} times). Total: ${totalDistractions} distractions.`;
 }
@@ -941,12 +1112,26 @@ function loadDistractionChart() {
 function requestNotificationPermission() {
     if (!("Notification" in window)) { showAlert("❌ Your browser doesn't support desktop notifications", "error"); return; }
     if (Notification.permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications already enabled!", "success"); showReminderSettings(); return; }
-    if (Notification.permission !== "denied") Notification.requestPermission().then(permission => { if (permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications enabled!", "success"); showReminderSettings(); setupReminderSystem(); } else showAlert("⚠️ Notification permission denied.", "error"); });
+    if (Notification.permission !== "denied") Notification.requestPermission().then(permission => { 
+        if (permission === "granted") { 
+            notificationPermissionGranted = true; 
+            showAlert("✅ Notifications enabled!", "success"); 
+            showReminderSettings(); 
+            setupReminderSystem(); 
+        } else showAlert("⚠️ Notification permission denied.", "error"); 
+    });
     else showAlert("🔕 Notifications are blocked.", "error");
 }
 
-function showReminderSettings() { const card = document.getElementById("reminder-settings"); if(card) card.style.display = "block"; loadReminderSettings(); }
-function toggleReminderSettings() { const ctrl = document.querySelector('.reminder-controls'); if(ctrl) ctrl.style.display = ctrl.style.display === 'none' ? 'flex' : 'none'; }
+function showReminderSettings() { 
+    const card = document.getElementById("reminder-settings"); 
+    if(card) card.style.display = "block"; 
+    loadReminderSettings(); 
+}
+function toggleReminderSettings() { 
+    const ctrl = document.querySelector('.reminder-controls'); 
+    if(ctrl) ctrl.style.display = ctrl.style.display === 'none' ? 'flex' : 'none'; 
+}
 function loadReminderSettings() {
     const daily = localStorage.getItem("dailyReminderEnabled") === "true";
     document.getElementById("daily-reminder-toggle").checked = daily;
@@ -959,8 +1144,18 @@ function saveReminderTime() { localStorage.setItem("reminderTime", document.getE
 function toggleWeeklyReport() { localStorage.setItem("weeklyReportEnabled", document.getElementById("weekly-report-toggle").checked); }
 function toggleNudge() { localStorage.setItem("nudgeEnabled", document.getElementById("nudge-toggle").checked); }
 function setupReminderSystem() {}
-function getBestWorkTimeSuggestions() { const history = getHistory(); if (history.length < 5) return "Log at least 5 entries to get suggestions!"; return "Based on your data, optimal work hours vary. Keep tracking!"; }
-function displayWorkTimeSuggestion() { const container = document.getElementById("work-time-suggestion"); if (container) { container.innerHTML = `<h4>⏰ Personalized Work Suggestion</h4><p>${getBestWorkTimeSuggestions()}</p>`; container.style.display = "block"; } }
+function getBestWorkTimeSuggestions() { 
+    const history = getHistory(); 
+    if (history.length < 5) return "Log at least 5 entries to get suggestions!"; 
+    return "Based on your data, optimal work hours vary. Keep tracking!"; 
+}
+function displayWorkTimeSuggestion() { 
+    const container = document.getElementById("work-time-suggestion"); 
+    if (container) { 
+        container.innerHTML = `<h4>⏰ Personalized Work Suggestion</h4><p>${getBestWorkTimeSuggestions()}</p>`; 
+        container.style.display = "block"; 
+    } 
+}
 function addWorkTimeSuggestionCard() { displayWorkTimeSuggestion(); }
 
 // ============================================
@@ -1014,6 +1209,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initTheme();
     const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
     if (defaultMoodBtn) defaultMoodBtn.classList.add('active');
-    if (Notification.permission === "granted") { notificationPermissionGranted = true; setupReminderSystem(); }
+    if (Notification.permission === "granted") { 
+        notificationPermissionGranted = true; 
+        setupReminderSystem(); 
+    }
     updateAutoProductivityDisplay();
+
+    // Load backup on start
+    const saved = getHistory();
+    if (saved.length > 0) permanentHistoryBackup = [...saved];
 });
