@@ -192,13 +192,15 @@
             </div>
         </div>
 
-        <!-- History Screen -->
+        <!-- History Screen - ONLY THIS PART WAS UPDATED -->
         <div id="history-screen" class="screen history-screen hidden">
             <header class="dashboard-header">
                 <div class="header-content">
                     <div><h2 class="greeting">📊 Your Results History</h2><p class="location-date">Track your productivity journey</p></div>
                     <div class="header-buttons">
                         <button id="history-theme-toggle" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+                        <!-- NEW DOWNLOAD BUTTON -->
+                        <button onclick="downloadHistoryCSV()" class="btn btn-primary">📥 Download CSV</button>
                         <button onclick="clearAllHistory()" class="btn btn-secondary btn-danger">🗑️ Clear All</button>
                         <button onclick="backToDashboard()" class="btn btn-secondary">← Back</button>
                     </div>
@@ -218,7 +220,9 @@
             </div>
         </div>
     </div>
+
     <div id="detail-modal" class="modal hidden"><div class="modal-content"><button onclick="closeDetailModal()" class="modal-close">×</button><div id="detail-content" class="detail-content"></div></div></div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="script.js"></script>
 </body>

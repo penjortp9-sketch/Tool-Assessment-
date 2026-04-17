@@ -668,8 +668,15 @@ function getHistory() { const stored = localStorage.getItem('productivity_histor
 // HISTORY SCREEN
 // ============================================
 
-function showHistoryScreen() { document.getElementById('main-screen').classList.add('hidden'); document.getElementById('history-screen').classList.remove('hidden'); loadHistoryData(); }
-function backToDashboard() { document.getElementById('history-screen').classList.add('hidden'); document.getElementById('main-screen').classList.remove('hidden'); }
+function showHistoryScreen() { 
+    document.getElementById('main-screen').classList.add('hidden'); 
+    document.getElementById('history-screen').classList.remove('hidden'); 
+    loadHistoryData(); 
+}
+function backToDashboard() { 
+    document.getElementById('history-screen').classList.add('hidden'); 
+    document.getElementById('main-screen').classList.remove('hidden'); 
+}
 
 function loadHistoryData() {
     const history = getHistory();
@@ -760,10 +767,88 @@ function resetFilters() { document.getElementById('mood-filter').value = ''; doc
 function clearAllHistory() { if (confirm('⚠️ Are you sure? This will delete all productivity entries permanently!')) { localStorage.removeItem('productivity_history'); showAlert('🗑️ All history cleared', 'success'); loadHistoryData(); } }
 
 // ============================================
+// UPDATED DOWNLOAD CSV - Distractions as words (not count)
+// ============================================
+
+function downloadHistoryCSV() {
+    const history = getHistory();
+    if (history.length === 0) {
+        showAlert("No history data to download", "warning");
+        return;
+    }
+
+    let csvContent = "Date,Time,Mood,Productivity (/10),Total Hours,Blocks,Tasks,Distractions,Comments\n";
+
+    history.forEach(entry => {
+        let moodText = entry.mood;
+        if (moodText === "🔥") moodText = "Focused";
+        else if (moodText === "😊") moodText = "Happy";
+        else if (moodText === "😴") moodText = "Tired";
+
+        // Build distraction text (actual names, not count)
+        let distractionText = "None";
+        if (entry.distractions && Object.keys(entry.distractions).length > 0) {
+            let allDist = [];
+            for (let blockIdx in entry.distractions) {
+                const distList = entry.distractions[blockIdx];
+                distList.forEach(d => {
+                    let cleanDist = d.distractionType || d.customText || "Other";
+                    // Clean emojis to words
+                    cleanDist = cleanDist.replace(/📱/g, "Social Media")
+                                       .replace(/📧/g, "Email")
+                                       .replace(/📞/g, "Phone Call")
+                                       .replace(/💬/g, "Messaging")
+                                       .replace(/🔊/g, "Noise")
+                                       .replace(/💭/g, "Daydreaming")
+                                       .replace(/🍽️/g, "Eating")
+                                       .replace(/📺/g, "Videos")
+                                       .replace(/🎮/g, "Gaming")
+                                       .replace(/😴/g, "Fatigue")
+                                       .replace(/✨/g, "Other");
+                    allDist.push(cleanDist);
+                });
+            }
+            distractionText = allDist.join(" | ");
+        }
+
+        const row = [
+            entry.date,
+            new Date(entry.timestamp).toLocaleTimeString(),
+            moodText,
+            entry.productivity,
+            entry.totalHours,
+            entry.blocks,
+            `"${entry.tasks.replace(/"/g, '""')}"`,
+            `"${distractionText}"`,
+            `"${(entry.comments || "").replace(/"/g, '""')}"`
+        ].join(",");
+
+        csvContent += row + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Chimla_Tabdew_History_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showAlert("✅ History downloaded as CSV successfully!", "success");
+}
+
+// ============================================
 // CHART FUNCTIONS
 // ============================================
 
-function switchChartTab(tab, event) { document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.chart-container').forEach(c => c.classList.remove('active')); event.target.classList.add('active'); document.getElementById(`${tab}-chart-container`).classList.add('active'); }
+function switchChartTab(tab, event) { 
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active')); 
+    document.querySelectorAll('.chart-container').forEach(c => c.classList.remove('active')); 
+    event.target.classList.add('active'); 
+    document.getElementById(`${tab}-chart-container`).classList.add('active'); 
+}
 
 function loadProductivityTrendChart() {
     const history = getHistory();
@@ -919,6 +1004,7 @@ window.toggleCustomInput = toggleCustomInput;
 window.showDistractionInsightsModal = showDistractionInsightsModal;
 window.closeDistractionInsightsModal = closeDistractionInsightsModal;
 window.handleDistractionSelectChange = handleDistractionSelectChange;
+window.downloadHistoryCSV = downloadHistoryCSV;
 
 // ============================================
 // INITIALIZATION
