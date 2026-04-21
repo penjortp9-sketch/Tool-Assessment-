@@ -605,24 +605,50 @@ function setupEventListeners() {
 }
 
 // ============================================
-// SAVE ENTRY
+// SAVE ENTRY (UPDATED - Saves ALL block and distraction data)
 // ============================================
 
 function saveEntry() {
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const missingBlocks = [], uncompletedBlocks = [];
+    
     for (let i = 0; i < blocksCount; i++) {
         if (!blockTasksMap[i] || blockTasksMap[i].length === 0) missingBlocks.push(i + 1);
         else if (!blockCompletionMap[i]) uncompletedBlocks.push(i + 1);
     }
-    if (missingBlocks.length > 0) { showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error"); return; }
-    if (uncompletedBlocks.length > 0) { showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error"); return; }
+    
+    if (missingBlocks.length > 0) { 
+        showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error"); 
+        return; 
+    }
+    if (uncompletedBlocks.length > 0) { 
+        showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error"); 
+        return; 
+    }
+    
     const autoScore = calculateAutoProductivityScore();
     const finalProductivity = autoScore !== null ? autoScore : 5;
+    
+    // Save ALL block multi-tasks data with ratings
     const blockMultiTasksData = {};
-    for (let i = 0; i < blocksCount; i++) if (blockTasksMap[i]) blockMultiTasksData[i] = blockTasksMap[i].map(t => ({ taskName: t.taskName, rating: t.rating }));
+    for (let i = 0; i < blocksCount; i++) {
+        if (blockTasksMap[i]) {
+            blockMultiTasksData[i] = blockTasksMap[i].map(t => ({ 
+                taskName: t.taskName, 
+                rating: t.rating 
+            }));
+        }
+    }
+    
+    // Save ALL distraction data
     const distractionData = {};
-    for (let i = 0; i < blocksCount; i++) if (distractionLogs[i] && distractionLogs[i].length > 0) distractionData[i] = [...distractionLogs[i]];
+    for (let i = 0; i < blocksCount; i++) {
+        if (distractionLogs[i] && distractionLogs[i].length > 0) {
+            distractionData[i] = [...distractionLogs[i]];
+        }
+    }
+    
+    // Create complete entry with ALL data
     const entry = {
         timestamp: new Date().toISOString(),
         date: new Date().toLocaleDateString('en-GB'),
@@ -631,12 +657,13 @@ function saveEntry() {
         totalHours: parseFloat(document.getElementById('total-hours').value),
         blocks: blocksCount,
         blockMultiTasks: blockMultiTasksData,
-        blockCompletionMap: { ...blockCompletionMap },
-        blockRatingMap: { ...blockRatingMap },
+        blockCompletionMap: JSON.parse(JSON.stringify(blockCompletionMap)),
+        blockRatingMap: JSON.parse(JSON.stringify(blockRatingMap)),
         productivity: finalProductivity,
         comments: document.getElementById('comments').value,
         distractions: distractionData
     };
+    
     let history = getHistory();
     history.push(entry);
     localStorage.setItem('productivity_history', JSON.stringify(history));
@@ -669,9 +696,11 @@ function resetForm() {
     updateDistractionPatterns();
 }
 
+// UPDATED getHistory function
 function getHistory() { 
     const stored = localStorage.getItem('productivity_history'); 
-    return stored ? JSON.parse(stored) : []; 
+    if (!stored) return [];
+    return JSON.parse(stored); 
 }
 
 // ============================================
@@ -739,7 +768,40 @@ function displayHistory() {
     list.innerHTML = history.slice().reverse().map((entry, idx) => {
         let distractionCount = 0;
         if (entry.distractions) Object.values(entry.distractions).forEach(distList => distractionCount += distList.length);
-        return `<div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})"><div class="history-item-header"><div class="history-date"><span class="date-full">${entry.date}</span><span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span></div><div class="history-mood">${entry.mood}</div></div><div class="history-quick-stats"><div class="quick-stat"><span class="stat-text productivity-${entry.productivity >= 8 ? 'high' : entry.productivity >= 5 ? 'medium' : 'low'}">⭐ ${entry.productivity}/10</span></div><div class="quick-stat">⏱️ ${entry.totalHours}h</div><div class="quick-stat">📦 ${entry.blocks} blocks</div>${distractionCount > 0 ? `<div class="quick-stat">🚫 ${distractionCount} distractions</div>` : ''}</div><p class="history-tasks">${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p><div class="history-item-action">View Details →</div></div>`;
+        
+        let completedBlocks = 0;
+        let totalBlocks = 0;
+        if (entry.blockCompletionMap) {
+            totalBlocks = Object.keys(entry.blockCompletionMap).length;
+            completedBlocks = Object.values(entry.blockCompletionMap).filter(v => v === true).length;
+        }
+        
+        let blockRatingSummary = '';
+        if (entry.blockRatingMap && Object.keys(entry.blockRatingMap).length > 0) {
+            const ratings = Object.values(entry.blockRatingMap);
+            const avgRating = (ratings.reduce((a,b) => a + b, 0) / ratings.length).toFixed(1);
+            blockRatingSummary = `<div class="quick-stat">⭐ Avg: ${avgRating}/10</div>`;
+        }
+        
+        return `<div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})">
+            <div class="history-item-header">
+                <div class="history-date">
+                    <span class="date-full">${entry.date}</span>
+                    <span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div class="history-mood">${entry.mood}</div>
+            </div>
+            <div class="history-quick-stats">
+                <div class="quick-stat"><span class="stat-text ${entry.productivity >= 8 ? 'productivity-high' : entry.productivity >= 5 ? 'productivity-medium' : 'productivity-low'}">⭐ ${entry.productivity}/10</span></div>
+                <div class="quick-stat">⏱️ ${entry.totalHours}h</div>
+                <div class="quick-stat">📦 ${entry.blocks} blocks</div>
+                ${totalBlocks > 0 ? `<div class="quick-stat">✅ ${completedBlocks}/${totalBlocks} done</div>` : ''}
+                ${blockRatingSummary}
+                ${distractionCount > 0 ? `<div class="quick-stat">🚫 ${distractionCount} distractions</div>` : ''}
+            </div>
+            <p class="history-tasks">${entry.tasks.substring(0, 60)}${entry.tasks.length > 60 ? '...' : ''}</p>
+            <div class="history-item-action">View Details →</div>
+        </div>`;
     }).join('');
 }
 
@@ -747,31 +809,101 @@ function showEntryDetail(idx) {
     const history = getHistory();
     const entry = history[idx];
     const detailContent = document.getElementById('detail-content');
+    
     let blockDetails = '';
     if (entry.blockMultiTasks) {
         for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
             const tasks = entry.blockMultiTasks[i];
             if (tasks && tasks.length > 0) {
-                const completed = entry.blockCompletionMap && entry.blockCompletionMap[i] ? '✅' : '⏳';
-                const avgRating = entry.blockRatingMap && entry.blockRatingMap[i] ? `⭐ ${entry.blockRatingMap[i]}/10` : 'Not rated';
-                blockDetails += `<div style="padding: 10px; background: var(--bg-light); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid var(--primary);"><strong>Block ${parseInt(i) + 1}:</strong><br>${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `⭐${t.rating}/10` : '📝 Not rated'}`).join('<br>')}<br><span style="font-size: 0.85rem; color: var(--text-muted);">${completed} ${avgRating}</span></div>`;
+                const completed = entry.blockCompletionMap && entry.blockCompletionMap[i] ? '✅ Completed' : '⏳ Not Completed';
+                const avgRating = entry.blockRatingMap && entry.blockRatingMap[i] ? `⭐ ${entry.blockRatingMap[i]}/10` : '📝 Not rated';
+                blockDetails += `<div style="padding: 12px; background: var(--bg-light); border-radius: 10px; margin-bottom: 12px; border-left: 4px solid ${entry.blockCompletionMap && entry.blockCompletionMap[i] ? '#10B981' : 'var(--primary)'};">
+                    <strong style="color: var(--primary);">Block ${parseInt(i) + 1}:</strong><br>
+                    ${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `<span style="color: #10B981;">⭐${t.rating}/10</span>` : '<span style="color: #F59E0B;">📝 Not rated</span>'}`).join('<br>')}
+                    <div style="margin-top: 8px; font-size: 0.85rem;">
+                        <span style="color: var(--text-muted);">${completed}</span> | 
+                        <span style="color: var(--text-muted);">${avgRating}</span>
+                    </div>
+                </div>`;
             }
         }
     }
+    
     let distractionDetails = '';
     if (entry.distractions && Object.keys(entry.distractions).length > 0) {
-        distractionDetails = '<div class="detail-section"><h3>🚫 Distractions Logged</h3>';
+        distractionDetails = '<div class="detail-section" style="border-left-color: #F59E0B;"><h3>🚫 Distractions Logged</h3>';
         for (let blockIdx in entry.distractions) {
             const distractions = entry.distractions[blockIdx];
             if (distractions && distractions.length > 0) {
-                distractionDetails += `<div style="margin-bottom: 10px;"><strong>Block ${parseInt(blockIdx) + 1}:</strong><br>`;
-                distractions.forEach(d => { distractionDetails += `<span class="distraction-tag" style="margin-right: 6px;">${escapeHtml(d.distractionType)}</span>`; });
-                distractionDetails += `</div>`;
+                distractionDetails += `<div style="margin-bottom: 12px; padding: 8px; background: rgba(245,158,11,0.1); border-radius: 8px;">
+                    <strong style="color: #F59E0B;">Block ${parseInt(blockIdx) + 1}:</strong><br>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                        ${distractions.map(d => `<span class="distraction-tag" style="background: #FEE2E2; color: #991B1B; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;">${escapeHtml(d.distractionType)}</span>`).join('')}
+                    </div>
+                </div>`;
             }
         }
         distractionDetails += '</div>';
     }
-    detailContent.innerHTML = `<div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p></div><div class="detail-grid"><div class="detail-item"><span class="detail-label">Mood</span><div class="detail-value">${entry.mood}</div></div><div class="detail-item"><span class="detail-label">Productivity</span><div class="detail-value">${entry.productivity}/10</div></div><div class="detail-item"><span class="detail-label">Hours</span><div class="detail-value">${entry.totalHours}h</div></div><div class="detail-item"><span class="detail-label">Blocks</span><div class="detail-value">${entry.blocks}</div></div></div><div class="detail-section"><h3>📋 Tasks</h3><p>${escapeHtml(entry.tasks)}</p></div>${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details (Multi-Task)</h3>${blockDetails}</div>` : ''}${distractionDetails}${entry.comments ? `<div class="detail-section"><h3>💭 Notes</h3><p>${escapeHtml(entry.comments)}</p></div>` : ''}`;
+    
+    let completedBlocks = 0;
+    let totalBlocks = 0;
+    if (entry.blockCompletionMap) {
+        totalBlocks = Object.keys(entry.blockCompletionMap).length;
+        completedBlocks = Object.values(entry.blockCompletionMap).filter(v => v === true).length;
+    }
+    
+    detailContent.innerHTML = `
+        <div class="detail-header">
+            <h2 class="detail-title">${entry.date}</h2>
+            <p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p>
+        </div>
+        
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="detail-label">Mood</span>
+                <div class="detail-value">${entry.mood}</div>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Productivity</span>
+                <div class="detail-value" style="color: ${entry.productivity >= 8 ? '#10B981' : entry.productivity >= 5 ? '#F59E0B' : '#EF4444'};">${entry.productivity}/10</div>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Hours</span>
+                <div class="detail-value">${entry.totalHours}h</div>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Blocks</span>
+                <div class="detail-value">${entry.blocks}</div>
+            </div>
+        </div>
+        
+        ${totalBlocks > 0 ? `<div class="detail-section" style="background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.05) 100%);">
+            <h3>📊 Block Completion</h3>
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--primary);">${completedBlocks}/${totalBlocks} Blocks Completed</div>
+            <div style="margin-top: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden;">
+                <div style="width: ${totalBlocks > 0 ? (completedBlocks/totalBlocks)*100 : 0}%; height: 8px; background: #10B981; transition: width 0.3s ease;"></div>
+            </div>
+        </div>` : ''}
+        
+        <div class="detail-section">
+            <h3>📋 All Tasks</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${entry.tasks.split(',').map(t => `<span style="background: var(--bg-light); padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">${escapeHtml(t.trim())}</span>`).join('')}
+            </div>
+        </div>
+        
+        ${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details (Multi-Task)</h3>${blockDetails}</div>` : ''}
+        
+        ${distractionDetails}
+        
+        ${entry.comments ? `<div class="detail-section"><h3>💭 Notes & Reflections</h3><p style="line-height: 1.6;">${escapeHtml(entry.comments)}</p></div>` : ''}
+        
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+            Logged on ${new Date(entry.timestamp).toLocaleString()}
+        </div>
+    `;
+    
     document.getElementById('detail-modal').classList.remove('hidden');
 }
 
