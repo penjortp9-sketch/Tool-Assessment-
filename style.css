@@ -342,3 +342,9 @@ body {
     .block-header { flex-direction: column; align-items: stretch; }
     .add-task-to-block { flex-direction: column; }
 }
+/* Full width centered button */
+.login-card .btn-primary {
+    display: block;
+    margin: 0 auto;
+    width: 100%;
+}
