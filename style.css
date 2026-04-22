@@ -348,3 +348,313 @@ body {
     margin: 0 auto;
     width: 100%;
 }
+
+/* ============================================
+   MICRO-INTERACTIONS & ANIMATIONS (NEW)
+   ============================================ */
+
+/* Pulse animation for save button */
+@keyframes btnPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(27, 77, 62, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 8px rgba(27, 77, 62, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(27, 77, 62, 0);
+    }
+}
+
+.btn-pulse {
+    animation: btnPulse 0.3s ease-in-out;
+}
+
+/* Shake animation for incomplete form fields */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
+}
+
+.shake-animation {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Ripple effect for buttons */
+.ripple-effect {
+    position: absolute;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.5);
+    transform: scale(0);
+    animation: ripple 0.6s linear;
+    pointer-events: none;
+}
+
+@keyframes ripple {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* Confetti pieces animation */
+.confetti-piece {
+    position: fixed;
+    top: -20px;
+    z-index: 10000;
+    pointer-events: none;
+    animation: confettiFall 3s ease-out forwards;
+}
+
+@keyframes confettiFall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+/* Celebration message */
+.celebration-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #1B4D3E, #2A7F6F);
+    color: white;
+    padding: 20px 40px;
+    border-radius: 50px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    z-index: 10001;
+    animation: celebratePop 0.5s ease-out, fadeOut 0.5s ease-out 2s forwards;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    text-align: center;
+    pointer-events: none;
+}
+
+@keyframes celebratePop {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+    70% {
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+/* Task list bounce animation */
+@keyframes taskBounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+.task-bounce {
+    animation: taskBounce 0.3s ease-in-out;
+}
+
+/* History item hover enhancement */
+.history-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.history-item:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Block row hover enhancement */
+.block-assign-row {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.block-assign-row:hover {
+    transform: translateX(4px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Button hover scale effect */
+.btn, .btn-primary, .btn-secondary, .btn-icon, .btn-sm, .btn-rate-block, .btn-complete-block {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn:hover, .btn-primary:hover, .btn-secondary:hover, .btn-icon:hover, .btn-sm:hover, .btn-rate-block:hover:not(:disabled), .btn-complete-block:hover {
+    transform: translateY(-2px);
+}
+
+.btn:active, .btn-primary:active, .btn-secondary:active, .btn-icon:active, .btn-sm:active, .btn-rate-block:active, .btn-complete-block:active {
+    transform: translateY(0px);
+}
+
+/* Task tag remove button hover */
+.task-tag-remove, .delete-task, .distraction-tag-remove {
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.task-tag-remove:hover, .delete-task:hover, .distraction-tag-remove:hover {
+    transform: scale(1.2);
+}
+
+/* Mood button active transition */
+.mood-btn {
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.mood-btn:hover {
+    transform: translateY(-2px);
+}
+
+.mood-btn.active {
+    transform: scale(1.02);
+}
+
+/* Form input focus animation */
+.form-input, .form-textarea, .filter-input, select {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.form-input:focus, .form-textarea:focus, .filter-input:focus, select:focus {
+    transform: translateY(-1px);
+}
+
+/* Modal fade-in animation */
+.modal {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(4px);
+    }
+}
+
+.modal-content {
+    animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Rating slider thumb transition */
+.range-slider::-webkit-slider-thumb {
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Heatmap day hover */
+.heatmap-day {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.heatmap-day:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1;
+}
+
+/* Scroll reveal animation for history items */
+.history-item {
+    animation: slideInUp 0.4s ease-out;
+    animation-fill-mode: both;
+}
+
+.history-item:nth-child(1) { animation-delay: 0.05s; }
+.history-item:nth-child(2) { animation-delay: 0.1s; }
+.history-item:nth-child(3) { animation-delay: 0.15s; }
+.history-item:nth-child(4) { animation-delay: 0.2s; }
+.history-item:nth-child(5) { animation-delay: 0.25s; }
+.history-item:nth-child(6) { animation-delay: 0.3s; }
+.history-item:nth-child(7) { animation-delay: 0.35s; }
+.history-item:nth-child(8) { animation-delay: 0.4s; }
+.history-item:nth-child(9) { animation-delay: 0.45s; }
+.history-item:nth-child(10) { animation-delay: 0.5s; }
+
+/* Stat card hover animation */
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Chart tab transition */
+.chart-tab {
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.chart-tab:hover {
+    transform: translateY(-2px);
+}
+
+/* Distraction tag hover */
+.distraction-tag {
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.distraction-tag:hover {
+    transform: scale(1.02);
+}
+
+/* Login card animation */
+.login-card {
+    animation: slideInDown 0.6s ease-out;
+}
+
+/* Dashboard header animation */
+.dashboard-header {
+    animation: slideInDown 0.6s ease-out 0.1s both;
+}
+
+/* Section fade-in animations */
+.form-section, .summary-card, .reflection-card, .stats-summary, .charts-section, .filter-section {
+    animation: fadeIn 0.6s ease-out;
+    animation-fill-mode: both;
+}
+
+.form-section:nth-child(1) { animation-delay: 0.05s; }
+.form-section:nth-child(2) { animation-delay: 0.1s; }
+.form-section:nth-child(3) { animation-delay: 0.15s; }
+.form-section:nth-child(4) { animation-delay: 0.2s; }
+.form-section:nth-child(5) { animation-delay: 0.25s; }
+.form-section:nth-child(6) { animation-delay: 0.3s; }
+.form-section:nth-child(7) { animation-delay: 0.35s; }
+.form-section:nth-child(8) { animation-delay: 0.4s; }

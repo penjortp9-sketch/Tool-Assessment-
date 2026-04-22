@@ -43,6 +43,85 @@ const distractionTypes = [
 ];
 
 // ============================================
+// ANIMATION & MICRO-INTERACTION FUNCTIONS
+// ============================================
+
+function addPulseAnimation(element) {
+    if (!element) return;
+    element.classList.add('btn-pulse');
+    setTimeout(() => {
+        element.classList.remove('btn-pulse');
+    }, 300);
+}
+
+function addShakeAnimation(element) {
+    if (!element) return;
+    element.classList.add('shake-animation');
+    setTimeout(() => {
+        element.classList.remove('shake-animation');
+    }, 500);
+}
+
+function createRipple(event, element) {
+    const button = element || event.currentTarget;
+    const ripple = document.createElement('span');
+    const rect = button.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const x = event.clientX - rect.left - size / 2;
+    const y = event.clientY - rect.top - size / 2;
+    
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    ripple.className = 'ripple-effect';
+    
+    button.style.position = 'relative';
+    button.style.overflow = 'hidden';
+    button.appendChild(ripple);
+    
+    setTimeout(() => {
+        ripple.remove();
+    }, 600);
+}
+
+function triggerConfetti() {
+    const colors = ['#1B4D3E', '#2A7F6F', '#D4A574', '#10B981', '#F59E0B'];
+    
+    for (let i = 0; i < 80; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti-piece';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.animationDelay = Math.random() * 0.5 + 's';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.width = Math.random() * 8 + 4 + 'px';
+        confetti.style.height = Math.random() * 12 + 6 + 'px';
+        confetti.style.opacity = Math.random() * 0.7 + 0.3;
+        document.body.appendChild(confetti);
+        
+        setTimeout(() => {
+            confetti.remove();
+        }, 3000);
+    }
+    
+    // Also show a celebration message
+    const celebration = document.createElement('div');
+    celebration.className = 'celebration-message';
+    celebration.innerHTML = '🎉 Amazing! High Productivity Day! 🎉';
+    document.body.appendChild(celebration);
+    setTimeout(() => {
+        celebration.remove();
+    }, 2500);
+}
+
+// Add ripple to all buttons
+document.addEventListener('click', function(e) {
+    const button = e.target.closest('.btn, .btn-primary, .btn-secondary, .btn-icon, .btn-sm, .btn-rate-block, .btn-complete-block');
+    if (button && !button.classList.contains('no-ripple')) {
+        createRipple(e, button);
+    }
+});
+
+// ============================================
 // DARK/LIGHT MODE TOGGLE
 // ============================================
 
@@ -222,7 +301,12 @@ function addTaskToBlock(blockIdx) {
     const select = document.getElementById(`block-select-${blockIdx}`);
     if (!select) return;
     const selectedTask = select.value;
-    if (!selectedTask) { showAlert("Please select a task to add", "warning"); return; }
+    if (!selectedTask) { 
+        const selectElement = document.getElementById(`block-select-${blockIdx}`);
+        addShakeAnimation(selectElement);
+        showAlert("Please select a task to add", "warning"); 
+        return; 
+    }
     if (!blockTasksMap[blockIdx]) blockTasksMap[blockIdx] = [];
     blockTasksMap[blockIdx].push({ taskName: selectedTask, rating: null });
     blockCompletionMap[blockIdx] = false;
@@ -428,7 +512,11 @@ function handleDistractionSelectChange(blockIdx) {
 
 function addSelectedDistraction(blockIdx) {
     const select = document.getElementById(`distraction-select-${blockIdx}`);
-    if (!select || !select.value) { showAlert("Please select a distraction type", "warning"); return; }
+    if (!select || !select.value) { 
+        addShakeAnimation(select);
+        showAlert("Please select a distraction type", "warning"); 
+        return; 
+    }
     if (!distractionLogs[blockIdx]) distractionLogs[blockIdx] = [];
     distractionLogs[blockIdx].push({ distractionType: select.value, customText: null });
     select.value = "";
@@ -441,7 +529,11 @@ function addSelectedDistraction(blockIdx) {
 function addCustomDistraction(blockIdx) {
     const input = document.getElementById(`custom-text-${blockIdx}`);
     const customText = input.value.trim();
-    if (!customText) { showAlert("Please describe the distraction", "warning"); return; }
+    if (!customText) { 
+        addShakeAnimation(input);
+        showAlert("Please describe the distraction", "warning"); 
+        return; 
+    }
     if (!distractionLogs[blockIdx]) distractionLogs[blockIdx] = [];
     distractionLogs[blockIdx].push({ distractionType: customText, customText: customText });
     input.value = "";
@@ -522,7 +614,11 @@ function addTask() {
     const input = document.getElementById('task-input');
     const val = input.value.trim();
     if (val) {
-        if (taskList.includes(val)) { showAlert("⚠️ Task already exists!", "warning"); return; }
+        if (taskList.includes(val)) { 
+            addShakeAnimation(input);
+            showAlert("⚠️ Task already exists!", "warning"); 
+            return; 
+        }
         taskList.push(val);
         updateTaskListUI();
         input.value = '';
@@ -532,6 +628,15 @@ function addTask() {
         renderDistractionTrackerUI();
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
+        // Add a small bounce animation to the task list
+        const taskListElement = document.getElementById('task-checklist');
+        if (taskListElement) {
+            taskListElement.classList.add('task-bounce');
+            setTimeout(() => taskListElement.classList.remove('task-bounce'), 300);
+        }
+    } else {
+        addShakeAnimation(input);
+        showAlert("Please enter a task", "warning");
     }
 }
 
@@ -609,6 +714,9 @@ function setupEventListeners() {
 // ============================================
 
 function saveEntry() {
+    const saveButton = document.getElementById('saveEntryBtn');
+    addPulseAnimation(saveButton);
+    
     const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
     const missingBlocks = [], uncompletedBlocks = [];
     
@@ -618,6 +726,8 @@ function saveEntry() {
     }
     
     if (missingBlocks.length > 0) { 
+        const missingBlocksElement = document.getElementById('blockAssignmentSection');
+        addShakeAnimation(missingBlocksElement);
         showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error"); 
         return; 
     }
@@ -628,6 +738,11 @@ function saveEntry() {
     
     const autoScore = calculateAutoProductivityScore();
     const finalProductivity = autoScore !== null ? autoScore : 5;
+    
+    // Trigger confetti for high productivity day (score ≥ 8)
+    if (finalProductivity >= 8) {
+        triggerConfetti();
+    }
     
     // Save ALL block multi-tasks data with ratings
     const blockMultiTasksData = {};
