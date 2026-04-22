@@ -122,6 +122,37 @@ document.addEventListener('click', function(e) {
 });
 
 // ============================================
+// TOOL GUIDE MODAL FUNCTIONS
+// ============================================
+
+function showToolGuide() {
+    const modal = document.getElementById('tool-guide-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.animation = 'fadeIn 0.3s ease-out';
+    }
+}
+
+function closeToolGuide() {
+    const modal = document.getElementById('tool-guide-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('tool-guide-modal');
+    const infoBox = document.querySelector('.info-box');
+    if (modal && !modal.classList.contains('hidden')) {
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent && !modalContent.contains(event.target) && event.target !== infoBox) {
+            closeToolGuide();
+        }
+    }
+});
+
+// ============================================
 // DARK/LIGHT MODE TOGGLE
 // ============================================
 
@@ -739,7 +770,7 @@ function saveEntry() {
     const autoScore = calculateAutoProductivityScore();
     const finalProductivity = autoScore !== null ? autoScore : 5;
     
-    // Trigger confetti for high productivity day (score ≥ 8)
+    // Trigger confetti for high productivity day (score >= 8)
     if (finalProductivity >= 8) {
         triggerConfetti();
     }
@@ -1447,6 +1478,8 @@ window.showDistractionInsightsModal = showDistractionInsightsModal;
 window.closeDistractionInsightsModal = closeDistractionInsightsModal;
 window.handleDistractionSelectChange = handleDistractionSelectChange;
 window.downloadHistoryCSV = downloadHistoryCSV;
+window.showToolGuide = showToolGuide;
+window.closeToolGuide = closeToolGuide;
 
 // ============================================
 // INITIALIZATION

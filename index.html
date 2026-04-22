@@ -18,8 +18,18 @@
                 <div class="login-header">
                     <h1 class="logo-title">Chimla Tabdew</h1>
                     <div class="logo-subtitle">Personal Productivity Companion</div>
-<div style="text-align: center; margin: 8px 0; font-weight: 500; color: var(--primary); font-size: 0.85rem; letter-spacing: 0.3px;">I chose Chimla Tabdew Tool because it combines task management, distraction tracking, and productivity analytics into one simple tool. It helps me stay focused by letting me assign tasks to time blocks, rate my performance, and identify what breaks my concentration. The visual insights and auto-scoring keep me accountable and motivated to improve every day.</div>
-<div class="welcome-text">Welcome back, Smart Worker! 🎉</div>
+                    
+                    <!-- INFO BOX - Click to learn about the tool -->
+                    <div class="info-box" onclick="showToolGuide()">
+                        <div class="info-box-icon">📖</div>
+                        <div class="info-box-content">
+                            <div class="info-box-title">Click here first to know about this tool</div>
+                            <div class="info-box-text">Learn how Chimla Tabdew helps you track tasks, blocks, distractions & productivity →</div>
+                        </div>
+                        <div class="info-box-arrow">▶</div>
+                    </div>
+                    
+                    <div class="welcome-text">Welcome back, Smart Worker! 🎉</div>
                     <div class="form-group">
                         <label class="form-label">Your Name</label>
                         <input type="text" id="username" placeholder="Enter your name" value="Penjor" class="form-input" required>
@@ -32,6 +42,71 @@
                     </div>
                     <button onclick="login()" class="btn btn-primary">Enter Workspace</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- TOOL GUIDE MODAL POPUP -->
+        <div id="tool-guide-modal" class="modal hidden">
+            <div class="modal-content guide-modal-content">
+                <button onclick="closeToolGuide()" class="modal-close">×</button>
+                <div class="guide-header">
+                    <span class="guide-icon">🧠</span>
+                    <h2 class="guide-title">How to Use Chimla Tabdew</h2>
+                    <p class="guide-subtitle">Your complete productivity companion</p>
+                </div>
+                <div class="guide-content">
+                    <div class="guide-section">
+                        <div class="guide-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>📝 Add Your Tasks</h4>
+                                <p>Type your daily tasks in the "Add a task" field and click +. These will be available to assign to work blocks.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>⏰ Set Work Blocks</h4>
+                                <p>Enter total work hours and number of blocks. Click ⚡ to auto-generate block schedule.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>🎯 Assign Tasks to Blocks</h4>
+                                <p>For each block, select tasks from dropdown and click "Add Task". Mark blocks as completed when done.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h4>⭐ Rate Your Performance</h4>
+                                <p>After completing a block, click "Rate Block" to rate each task (1-10). Your productivity score auto-calculates.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <h4>🚫 Track Distractions</h4>
+                                <p>Select or add custom distractions that occurred during each block. View insights to improve focus.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">6</div>
+                            <div class="step-content">
+                                <h4>📊 Review History</h4>
+                                <p>Click "History" to see charts, trends, and download CSV reports of your productivity journey.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="guide-tip">
+                        <span class="tip-icon">💡</span>
+                        <div class="tip-text">
+                            <strong>Pro Tip:</strong> Enable daily reminders to never miss logging your productivity. High productivity days (score ≥ 8) trigger confetti celebration!
+                        </div>
+                    </div>
+                </div>
+                <button onclick="closeToolGuide()" class="btn btn-primary guide-close-btn">Got it! Let's start →</button>
             </div>
         </div>
 
@@ -191,14 +266,13 @@
             </div>
         </div>
 
-        <!-- History Screen - ONLY THIS PART WAS UPDATED -->
+        <!-- History Screen -->
         <div id="history-screen" class="screen history-screen hidden">
             <header class="dashboard-header">
                 <div class="header-content">
                     <div><h2 class="greeting">📊 Your Results History</h2><p class="location-date">Track your productivity journey</p></div>
                     <div class="header-buttons">
                         <button id="history-theme-toggle" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
-                        <!-- NEW DOWNLOAD BUTTON -->
                         <button onclick="downloadHistoryCSV()" class="btn btn-primary">📥 Download CSV</button>
                         <button onclick="clearAllHistory()" class="btn btn-secondary btn-danger">🗑️ Clear All</button>
                         <button onclick="backToDashboard()" class="btn btn-secondary">← Back</button>
