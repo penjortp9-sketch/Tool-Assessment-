@@ -660,7 +660,7 @@ body {
 .form-section:nth-child(8) { animation-delay: 0.4s; }
 
 /* ============================================
-   INFO BOX & TOOL GUIDE STYLES (NEW)
+   INFO BOX & TOOL GUIDE STYLES
    ============================================ */
 
 /* Info Box on Login Screen */
@@ -741,6 +741,40 @@ body {
 
 .info-box:hover .info-box-arrow {
     transform: translateX(5px);
+}
+
+/* WHY THIS TOOL SECTION - NEW */
+.why-this-tool {
+    background: linear-gradient(135deg, rgba(27, 77, 62, 0.1) 0%, rgba(212, 165, 116, 0.08) 100%);
+    border-radius: 20px;
+    padding: 20px 24px;
+    margin-bottom: 25px;
+    text-align: center;
+    border: 1px solid var(--primary);
+}
+
+.why-icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+}
+
+.why-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 12px;
+}
+
+.why-text {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.why-text strong {
+    color: var(--primary);
+    font-weight: 700;
 }
 
 /* Tool Guide Modal */
@@ -892,5 +926,13 @@ body {
     
     .info-box-text {
         font-size: 0.7rem;
+    }
+
+    .why-title {
+        font-size: 1.2rem;
+    }
+
+    .why-text {
+        font-size: 0.8rem;
     }
 }
