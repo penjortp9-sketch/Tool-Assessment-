@@ -2,8 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Chimla Tabdew | Multi-Task Blocks & Productivity Self-Assessment</title>
+    
+    <!-- PWA Meta Tags (Embedded - No external files needed) -->
+    <meta name="theme-color" content="#1B4D3E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Chimla Tabdew">
+    
+    <!-- Dynamic PWA Manifest (Embedded) -->
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Chimla%20Tabdew%20-%20Productivity%20Companion%22,%22short_name%22:%22Chimla%20Tabdew%22,%22description%22:%22Track%20tasks,%20blocks,%20distractions%20%26%20boost%20your%20productivity%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22theme_color%22:%22%231B4D3E%22,%22background_color%22:%22%230F3028%22,%22orientation%22:%22portrait%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20fill='%231B4D3E'/%3E%3Ctext%20x='50'%20y='67'%20font-size='50'%20text-anchor='middle'%20fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22any%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%20maskable%22}],%22shortcuts%22:[{%22name%22:%22Quick%20Log%22,%22short_name%22:%22Log%22,%22description%22:%22Quickly%20log%20your%20productivity%22,%22url%22:%22/?action=quick-log%22},{%22name%22:%22View%20History%22,%22short_name%22:%22History%22,%22description%22:%22View%20your%20productivity%20history%22,%22url%22:%22/?action=history%22}]}">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E">
+    
     <!-- Google Fonts & External Stylesheets -->
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -388,5 +401,144 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="script.js"></script>
+    
+    <!-- Embedded Service Worker Registration (No external sw.js needed) -->
+    <script>
+    (function registerEmbeddedServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        
+        // Complete Service Worker Code Embedded as String
+        const swCode = `const CACHE_NAME = 'chimla-tabdew-v1';
+const urlsToCache = ['/', '/new.html', '/style.css', '/script.js', 'https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'];
+
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(caches.keys().then(cacheNames => Promise.all(cacheNames.map(cacheName => { if (cacheName !== CACHE_NAME) return caches.delete(cacheName); }))).then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', event => {
+    event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+});
+
+self.addEventListener('sync', event => {
+    if (event.tag === 'sync-entries') {
+        event.waitUntil((async () => {
+            const cache = await caches.open('pending-entries');
+            const requests = await cache.keys();
+            for (const request of requests) {
+                try {
+                    const response = await fetch(request);
+                    if (response.ok) {
+                        await cache.delete(request);
+                        self.registration.showNotification('Chimla Tabdew', { body: 'Your offline entries have been synced! ✅', icon: 'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Crect width=\\'100\\' height=\\'100\\' fill=\\'%231B4D3E\\'/%3E%3Ctext x=\\'50\\' y=\\'67\\' font-size=\\'50\\' text-anchor=\\'middle\\' fill=\\'%23D4A574\\'%3E📊%3C/text%3E%3C/svg%3E', vibrate: [200, 100, 200] });
+                    }
+                } catch(e) {}
+            }
+        })());
+    }
+});
+
+self.addEventListener('push', event => {
+    const data = event.data.json();
+    event.waitUntil(self.registration.showNotification(data.title || 'Chimla Tabdew', { body: data.body || 'Time to log your productivity!', icon: 'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Crect width=\\'100\\' height=\\'100\\' fill=\\'%231B4D3E\\'/%3E%3Ctext x=\\'50\\' y=\\'67\\' font-size=\\'50\\' text-anchor=\\'middle\\' fill=\\'%23D4A574\\'%3E📊%3C/text%3E%3C/svg%3E', vibrate: [200, 100, 200], actions: [{ action: 'log', title: '📝 Quick Log' }, { action: 'snooze', title: '⏰ Remind Later' }, { action: 'view', title: '📊 View Stats' }] }));
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => { for (let client of windowClients) { if (client.url.includes('/') && 'focus' in client) { client.focus(); client.postMessage({ action: event.action }); return; } } if (clients.openWindow) return clients.openWindow('/'); }));
+});`;
+        
+        // Create blob from service worker code
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        
+        // Register the service worker
+        navigator.serviceWorker.register(swUrl)
+            .then(registration => {
+                console.log('✅ Chimla Tabdew PWA: Service Worker registered successfully');
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('📱 New version available! Refresh to update.');
+                        }
+                    });
+                });
+            })
+            .catch(error => console.error('❌ Service Worker registration failed:', error));
+        
+        // Handle messages from service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data.action === 'log' && window.quickLogWidget) {
+                window.quickLogWidget?.toggle();
+            } else if (event.data.action === 'view') {
+                showHistoryScreen();
+            }
+        });
+    })();
+    </script>
+    
+    <!-- PWA Install Prompt Handler -->
+    <script>
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show install banner after 3 seconds
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('installDismissed')) {
+                showInstallBanner();
+            }
+        }, 3000);
+    });
+    
+    function showInstallBanner() {
+        const banner = document.createElement('div');
+        banner.id = 'pwa-install-banner';
+        banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:1px solid var(--primary);animation:slideInUp 0.3s ease-out;';
+        banner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+                <div style="font-size:2rem;">📱</div>
+                <div style="flex:1;">
+                    <strong style="font-size:0.9rem;">Install Chimla Tabdew</strong>
+                    <small style="font-size:0.7rem;display:block;">Get app-like experience with offline support</small>
+                </div>
+                <button onclick="installPWA()" class="btn btn-primary btn-sm" style="padding:8px 16px;">Install</button>
+                <button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
+            </div>
+        `;
+        document.body.appendChild(banner);
+    }
+    
+    function installPWA() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                }
+                deferredPrompt = null;
+                document.getElementById('pwa-install-banner')?.remove();
+            });
+        }
+    }
+    
+    function dismissInstallBanner() {
+        document.getElementById('pwa-install-banner')?.remove();
+        localStorage.setItem('installDismissed', true);
+    }
+    
+    // Detect if already installed as PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        console.log('🎉 Chimla Tabdew is running as installed PWA');
+    }
+    </script>
 </body>
 </html>

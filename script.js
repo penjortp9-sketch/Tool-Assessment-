@@ -1,7 +1,7 @@
 // script.js
 // ============================================
 // CHIMLA TABDEW - MULTI-TASK BLOCK ASSIGNMENT SYSTEM
-// WITH USER AUTHENTICATION
+// WITH USER AUTHENTICATION & ENHANCED EXCEL EXPORT
 // ============================================
 
 // State Management
@@ -284,13 +284,15 @@ function performLogin(username, password, rememberMe = false) {
     setTimeout(() => { 
         autoGenerateBlocksManual(); 
         renderDistractionTrackerUI(); 
+        addBackupButton();
+        updateExportButton();
     }, 100);
     
     setupEventListeners();
     
     if (Notification.permission === "granted") { 
         showReminderSettings(); 
-        setupReminderSystem(); 
+        setupLocalNotifications();
     }
     
     addWorkTimeSuggestionCard();
@@ -1436,7 +1438,7 @@ function clearAllHistory() {
 }
 
 // ============================================
-// DOWNLOAD CSV - Uses permanent backup
+// ENHANCED CSV/EXCEL EXPORT (UPDATED)
 // ============================================
 
 function downloadHistoryCSV() {
@@ -1447,14 +1449,43 @@ function downloadHistoryCSV() {
         return;
     }
 
-    let csvContent = "Date,Time,Mood,Productivity (/10),Total Hours,Blocks,Tasks,Distractions,Comments\n";
-
+    let csvRows = [];
+    
+    // Headers with Excel-friendly names
+    const headers = [
+        "Date", "Time", "Mood", "Productivity Score (/10)", 
+        "Total Hours", "Number of Blocks", "All Tasks", 
+        "Block Details with Ratings", "Distractions", "Comments"
+    ];
+    csvRows.push(headers.join(','));
+    
+    // Process each entry
     historyToDownload.forEach(entry => {
+        // Format mood
         let moodText = entry.mood;
         if (moodText === "🔥") moodText = "Focused";
         else if (moodText === "😊") moodText = "Happy";
         else if (moodText === "😴") moodText = "Tired";
-
+        
+        // Format block details
+        let blockDetailsText = "";
+        if (entry.blockMultiTasks) {
+            const blockList = [];
+            for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
+                const tasks = entry.blockMultiTasks[i];
+                if (tasks && tasks.length > 0) {
+                    const taskDetails = tasks.map(t => {
+                        const taskName = t.taskName;
+                        const rating = t.rating ? `${t.rating}/10` : 'Not rated';
+                        return `${taskName} [${rating}]`;
+                    }).join(', ');
+                    blockList.push(`Block ${i+1}: ${taskDetails}`);
+                }
+            }
+            blockDetailsText = blockList.join('; ');
+        }
+        
+        // Format distractions (clean emojis for Excel)
         let distractionText = "None";
         if (entry.distractions && Object.keys(entry.distractions).length > 0) {
             let allDist = [];
@@ -1462,49 +1493,219 @@ function downloadHistoryCSV() {
                 const distList = entry.distractions[blockIdx];
                 distList.forEach(d => {
                     let cleanDist = d.distractionType || d.customText || "Other";
-                    cleanDist = cleanDist.replace(/📱/g, "Social Media")
-                                       .replace(/📧/g, "Email")
-                                       .replace(/📞/g, "Phone Call")
-                                       .replace(/💬/g, "Messaging")
-                                       .replace(/🔊/g, "Noise")
-                                       .replace(/💭/g, "Daydreaming")
-                                       .replace(/🍽️/g, "Eating")
-                                       .replace(/📺/g, "Videos")
-                                       .replace(/🎮/g, "Gaming")
-                                       .replace(/😴/g, "Fatigue")
-                                       .replace(/✨/g, "Other");
+                    cleanDist = cleanDist.replace(/[📱📧📞💬🔊💭🍽️📺🎮😴✨]/g, '').trim();
                     allDist.push(cleanDist);
                 });
             }
-            distractionText = allDist.join(" | ");
+            distractionText = allDist.join(' | ');
         }
-
+        
+        // Build row
         const row = [
-            entry.date,
-            new Date(entry.timestamp).toLocaleTimeString(),
-            moodText,
+            `"${entry.date}"`,
+            `"${new Date(entry.timestamp).toLocaleTimeString()}"`,
+            `"${moodText}"`,
             entry.productivity,
             entry.totalHours,
             entry.blocks,
             `"${entry.tasks.replace(/"/g, '""')}"`,
-            `"${distractionText}"`,
+            `"${blockDetailsText.replace(/"/g, '""')}"`,
+            `"${distractionText.replace(/"/g, '""')}"`,
             `"${(entry.comments || "").replace(/"/g, '""')}"`
-        ].join(",");
-
-        csvContent += row + "\n";
+        ];
+        csvRows.push(row.join(','));
     });
-
+    
+    // Add BOM for Excel UTF-8 support
+    const csvContent = "\uFEFF" + csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Chimla_Tabdew_${currentUser ? currentUser.username : 'User'}_History_${new Date().toISOString().slice(0,10)}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Chimla_Tabdew_Export_${currentUser ? currentUser.username : 'User'}_${timestamp}.csv`);
     link.click();
-    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showAlert(`✅ Exported ${historyToDownload.length} entries to Excel!`, 'success');
+}
 
-    showAlert("✅ Full history downloaded successfully!", "success");
+// Export with date range filter
+function showExportOptions() {
+    const modalHtml = `
+        <div id="export-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10006;">
+            <div style="background:var(--card-bg);padding:24px;border-radius:20px;max-width:400px;width:90%;">
+                <h3 style="margin-bottom:15px;">📊 Export Data to Excel</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">Date Range</label>
+                    <select id="export-range" class="form-input" style="margin-bottom:10px;">
+                        <option value="all">All Time</option>
+                        <option value="last7">Last 7 Days</option>
+                        <option value="last30">Last 30 Days</option>
+                        <option value="last90">Last 90 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                
+                <div id="custom-date-range" style="display:none;">
+                    <div class="form-group">
+                        <label class="form-label">From Date</label>
+                        <input type="date" id="start-date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">To Date</label>
+                        <input type="date" id="end-date" class="form-input">
+                    </div>
+                </div>
+                
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button onclick="exportWithOptions()" class="btn btn-primary" style="flex:1;">📥 Export Excel</button>
+                    <button onclick="closeExportModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Date range toggle
+    document.getElementById('export-range').addEventListener('change', function() {
+        const customDiv = document.getElementById('custom-date-range');
+        customDiv.style.display = this.value === 'custom' ? 'block' : 'none';
+    });
+}
+
+function closeExportModal() {
+    document.getElementById('export-modal')?.remove();
+}
+
+function exportWithOptions() {
+    const range = document.getElementById('export-range').value;
+    let history = getHistory();
+    
+    const now = new Date();
+    let filteredHistory = [...history];
+    
+    switch(range) {
+        case 'last7':
+            const last7 = new Date();
+            last7.setDate(last7.getDate() - 7);
+            filteredHistory = history.filter(entry => new Date(entry.date) >= last7);
+            break;
+        case 'last30':
+            const last30 = new Date();
+            last30.setDate(last30.getDate() - 30);
+            filteredHistory = history.filter(entry => new Date(entry.date) >= last30);
+            break;
+        case 'last90':
+            const last90 = new Date();
+            last90.setDate(last90.getDate() - 90);
+            filteredHistory = history.filter(entry => new Date(entry.date) >= last90);
+            break;
+        case 'custom':
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+            if (startDate && endDate) {
+                filteredHistory = history.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate >= startDate && entryDate <= endDate;
+                });
+            }
+            break;
+    }
+    
+    if (filteredHistory.length === 0) {
+        showAlert('No data in selected date range', 'warning');
+        closeExportModal();
+        return;
+    }
+    
+    // Export the filtered data
+    exportFilteredHistoryToExcel(filteredHistory);
+    closeExportModal();
+}
+
+function exportFilteredHistoryToExcel(history) {
+    let csvRows = [];
+    
+    const headers = [
+        "Date", "Time", "Mood", "Productivity Score (/10)", 
+        "Total Hours", "Number of Blocks", "All Tasks", 
+        "Block Details with Ratings", "Distractions", "Comments"
+    ];
+    csvRows.push(headers.join(','));
+    
+    history.forEach(entry => {
+        let moodText = entry.mood;
+        if (moodText === "🔥") moodText = "Focused";
+        else if (moodText === "😊") moodText = "Happy";
+        else if (moodText === "😴") moodText = "Tired";
+        
+        let blockDetailsText = "";
+        if (entry.blockMultiTasks) {
+            const blockList = [];
+            for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
+                const tasks = entry.blockMultiTasks[i];
+                if (tasks && tasks.length > 0) {
+                    const taskDetails = tasks.map(t => {
+                        const taskName = t.taskName;
+                        const rating = t.rating ? `${t.rating}/10` : 'Not rated';
+                        return `${taskName} [${rating}]`;
+                    }).join(', ');
+                    blockList.push(`Block ${i+1}: ${taskDetails}`);
+                }
+            }
+            blockDetailsText = blockList.join('; ');
+        }
+        
+        let distractionText = "None";
+        if (entry.distractions && Object.keys(entry.distractions).length > 0) {
+            let allDist = [];
+            for (let blockIdx in entry.distractions) {
+                const distList = entry.distractions[blockIdx];
+                distList.forEach(d => {
+                    let cleanDist = d.distractionType || d.customText || "Other";
+                    cleanDist = cleanDist.replace(/[📱📧📞💬🔊💭🍽️📺🎮😴✨]/g, '').trim();
+                    allDist.push(cleanDist);
+                });
+            }
+            distractionText = allDist.join(' | ');
+        }
+        
+        const row = [
+            `"${entry.date}"`,
+            `"${new Date(entry.timestamp).toLocaleTimeString()}"`,
+            `"${moodText}"`,
+            entry.productivity,
+            entry.totalHours,
+            entry.blocks,
+            `"${entry.tasks.replace(/"/g, '""')}"`,
+            `"${blockDetailsText.replace(/"/g, '""')}"`,
+            `"${distractionText.replace(/"/g, '""')}"`,
+            `"${(entry.comments || "").replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(','));
+    });
+    
+    const csvContent = "\uFEFF" + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Chimla_Tabdew_Export_${currentUser ? currentUser.username : 'User'}_${timestamp}.csv`);
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    showAlert(`✅ Exported ${history.length} entries to Excel!`, 'success');
+}
+
+function updateExportButton() {
+    const historyBtn = document.querySelector('.header-buttons .btn-primary');
+    if (historyBtn && historyBtn.innerHTML.includes('📥 Download CSV')) {
+        historyBtn.innerHTML = '📊 Export to Excel';
+        historyBtn.onclick = showExportOptions;
+    }
 }
 
 // ============================================
@@ -1733,21 +1934,87 @@ function loadDistractionChart() {
 }
 
 // ============================================
-// NOTIFICATIONS & REMINDERS
+// NOTIFICATIONS & REMINDERS (FIXED FOR MOBILE)
 // ============================================
 
-function requestNotificationPermission() {
-    if (!("Notification" in window)) { showAlert("❌ Your browser doesn't support desktop notifications", "error"); return; }
-    if (Notification.permission === "granted") { notificationPermissionGranted = true; showAlert("✅ Notifications already enabled!", "success"); showReminderSettings(); return; }
-    if (Notification.permission !== "denied") Notification.requestPermission().then(permission => { 
+async function requestNotificationPermission() {
+    if (!("Notification" in window)) { 
+        showAlert("❌ Your browser doesn't support notifications", "error"); 
+        return; 
+    }
+    
+    if (Notification.permission === "granted") { 
+        notificationPermissionGranted = true; 
+        showAlert("✅ Notifications already enabled!", "success"); 
+        showReminderSettings();
+        
+        setTimeout(() => {
+            if (Notification.permission === "granted") {
+                new Notification("Chimla Tabdew", {
+                    body: "Notifications working! You'll receive daily reminders.",
+                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E",
+                    vibrate: [200, 100, 200]
+                });
+            }
+        }, 1000);
+        return; 
+    }
+    
+    if (Notification.permission !== "denied") {
+        const permission = await Notification.requestPermission();
         if (permission === "granted") { 
             notificationPermissionGranted = true; 
-            showAlert("✅ Notifications enabled!", "success"); 
-            showReminderSettings(); 
-            setupReminderSystem(); 
-        } else showAlert("⚠️ Notification permission denied.", "error"); 
-    });
-    else showAlert("🔕 Notifications are blocked.", "error");
+            showAlert("✅ Notifications enabled! You'll get daily reminders.", "success"); 
+            showReminderSettings();
+            setupLocalNotifications();
+            
+            setTimeout(() => {
+                new Notification("Chimla Tabdew", {
+                    body: "Reminders are now active! 🎉",
+                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E"
+                });
+            }, 500);
+        } else {
+            showAlert("⚠️ Please allow notifications for reminders.", "error");
+        }
+    } else {
+        showAlert("🔕 Notifications are blocked. Please enable in browser settings.", "error");
+    }
+}
+
+function setupLocalNotifications() {
+    if (window.notificationInterval) clearInterval(window.notificationInterval);
+    
+    window.notificationInterval = setInterval(() => {
+        const now = new Date();
+        const reminderTime = localStorage.getItem('reminderTime') || '20:00';
+        const [hours, minutes] = reminderTime.split(':');
+        
+        if (now.getHours() === parseInt(hours) && now.getMinutes() === parseInt(minutes)) {
+            const history = getHistory();
+            const today = new Date().toLocaleDateString('en-GB');
+            const loggedToday = history.some(entry => entry.date === today);
+            const lastNotificationDate = localStorage.getItem('lastNotificationDate');
+            
+            if (!loggedToday && lastNotificationDate !== today && Notification.permission === 'granted') {
+                const notification = new Notification("⏰ Chimla Tabdew Reminder", {
+                    body: "Don't forget to log your productivity today!",
+                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E",
+                    vibrate: [200, 100, 200],
+                    requireInteraction: true
+                });
+                
+                notification.onclick = function() {
+                    window.focus();
+                    document.getElementById('main-screen')?.classList.remove('hidden');
+                    document.getElementById('login-screen')?.classList.add('hidden');
+                    notification.close();
+                };
+                
+                localStorage.setItem('lastNotificationDate', today);
+            }
+        }
+    }, 60000);
 }
 
 function showReminderSettings() { 
@@ -1766,11 +2033,19 @@ function loadReminderSettings() {
     document.getElementById("nudge-toggle").checked = localStorage.getItem("nudgeEnabled") === "true";
     document.getElementById("reminder-time").value = localStorage.getItem("reminderTime") || "20:00";
 }
-function toggleDailyReminder() { localStorage.setItem("dailyReminderEnabled", document.getElementById("daily-reminder-toggle").checked); }
-function saveReminderTime() { localStorage.setItem("reminderTime", document.getElementById("reminder-time").value); }
+function toggleDailyReminder() { 
+    localStorage.setItem("dailyReminderEnabled", document.getElementById("daily-reminder-toggle").checked);
+    if (document.getElementById("daily-reminder-toggle").checked) {
+        setupLocalNotifications();
+    }
+}
+function saveReminderTime() { 
+    localStorage.setItem("reminderTime", document.getElementById("reminder-time").value);
+    showAlert(`Reminder time set to ${document.getElementById("reminder-time").value}`, 'success');
+}
 function toggleWeeklyReport() { localStorage.setItem("weeklyReportEnabled", document.getElementById("weekly-report-toggle").checked); }
 function toggleNudge() { localStorage.setItem("nudgeEnabled", document.getElementById("nudge-toggle").checked); }
-function setupReminderSystem() {}
+function setupReminderSystem() { setupLocalNotifications(); }
 function getBestWorkTimeSuggestions() { 
     const history = getHistory(); 
     if (history.length < 5) return "Log at least 5 entries to get suggestions!"; 
@@ -1784,6 +2059,275 @@ function displayWorkTimeSuggestion() {
     } 
 }
 function addWorkTimeSuggestionCard() { displayWorkTimeSuggestion(); }
+
+// ============================================
+// BACKUP & RESTORE (Cross-Device Sync)
+// ============================================
+
+function addBackupButton() {
+    const headerButtons = document.querySelector('.header-buttons');
+    if (headerButtons && !document.querySelector('#backup-btn')) {
+        const backupBtn = document.createElement('button');
+        backupBtn.id = 'backup-btn';
+        backupBtn.className = 'btn btn-secondary';
+        backupBtn.innerHTML = '💾 Backup/Restore';
+        backupBtn.onclick = showBackupModal;
+        headerButtons.appendChild(backupBtn);
+    }
+}
+
+function showBackupModal() {
+    const modalHtml = `
+        <div id="backup-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10005;">
+            <div style="background:var(--card-bg);padding:24px;border-radius:20px;max-width:400px;width:90%;">
+                <h3 style="margin-bottom:15px;">💾 Backup & Restore</h3>
+                <p style="margin-bottom:15px;font-size:0.85rem;">Move your data between devices</p>
+                <button onclick="exportUserData()" class="btn btn-primary" style="width:100%;margin-bottom:10px;">📤 Export Data</button>
+                <label class="btn btn-secondary" style="width:100%;text-align:center;cursor:pointer;display:block;">
+                    📥 Import Data
+                    <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importUserData(this.files[0])">
+                </label>
+                <button onclick="closeBackupModal()" class="btn btn-secondary" style="width:100%;margin-top:10px;">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeBackupModal() {
+    document.getElementById('backup-modal')?.remove();
+}
+
+function exportUserData() {
+    if (!currentUser) {
+        showAlert('Please login first', 'error');
+        return;
+    }
+    
+    const userData = {
+        username: currentUser.username,
+        fullname: currentUser.fullname,
+        history: getHistory(),
+        settings: {
+            theme: localStorage.getItem('theme'),
+            dailyReminder: localStorage.getItem('dailyReminderEnabled'),
+            reminderTime: localStorage.getItem('reminderTime')
+        },
+        exportDate: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(userData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chimla_backup_${currentUser.username}_${new Date().toISOString().slice(0,10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    showAlert('📦 Data exported! Save this file safely.', 'success');
+    closeBackupModal();
+}
+
+function importUserData(file) {
+    if (!currentUser) {
+        showAlert('Please login first', 'error');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            
+            if (importedData.history && Array.isArray(importedData.history)) {
+                const existingHistory = getHistory();
+                const mergedHistory = [...existingHistory, ...importedData.history];
+                const uniqueHistory = mergedHistory.filter((entry, index, self) => 
+                    index === self.findIndex(e => e.timestamp === entry.timestamp)
+                );
+                
+                localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify(uniqueHistory));
+                permanentHistoryBackup = [...uniqueHistory];
+                
+                if (importedData.settings) {
+                    if (importedData.settings.theme) applyTheme(importedData.settings.theme);
+                    if (importedData.settings.dailyReminder === 'true') {
+                        document.getElementById('daily-reminder-toggle').checked = true;
+                        setupLocalNotifications();
+                    }
+                    if (importedData.settings.reminderTime) {
+                        document.getElementById('reminder-time').value = importedData.settings.reminderTime;
+                    }
+                }
+                
+                showAlert(`✅ Imported ${importedData.history.length} entries!`, 'success');
+                loadHistoryData();
+            } else {
+                showAlert('Invalid backup file', 'error');
+            }
+        } catch(err) {
+            showAlert('Error reading backup file', 'error');
+        }
+    };
+    reader.readAsText(file);
+    closeBackupModal();
+}
+
+// ============================================
+// MOBILE COMPATIBILITY CHECK
+// ============================================
+
+function checkMobileCompatibility() {
+    const issues = [];
+    
+    try {
+        localStorage.setItem('test', 'test');
+        localStorage.removeItem('test');
+    } catch(e) {
+        issues.push('❌ localStorage not available (private browsing mode)');
+        showAlert('⚠️ Private browsing mode detected. Some features may not work properly.', 'warning');
+    }
+    
+    if (!('serviceWorker' in navigator)) {
+        issues.push('❌ Service Workers not supported');
+    }
+    
+    if (!('Notification' in window)) {
+        issues.push('❌ Notifications not supported');
+    }
+    
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        console.log('🎉 Chimla Tabdew is running as installed PWA');
+    }
+    
+    return issues;
+}
+
+// ============================================
+// PWA INSTALL PROMPT
+// ============================================
+
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    setTimeout(() => {
+        if (deferredPrompt && !localStorage.getItem('installDismissed') && 
+            !window.matchMedia('(display-mode: standalone)').matches) {
+            showInstallBanner();
+        }
+    }, 3000);
+});
+
+function showInstallBanner() {
+    const banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:2px solid var(--primary);animation:slideInUp 0.3s ease-out;';
+    banner.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+            <div style="font-size:2rem;">📱</div>
+            <div style="flex:1;">
+                <strong style="font-size:0.9rem;">Install Chimla Tabdew</strong>
+                <small style="font-size:0.7rem;display:block;">Get app-like experience with offline support</small>
+            </div>
+            <button onclick="installPWA()" class="btn btn-primary btn-sm" style="padding:8px 16px;">Install</button>
+            <button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+}
+
+function installPWA() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                showAlert('🎉 Thanks for installing Chimla Tabdew!', 'success');
+            }
+            deferredPrompt = null;
+            document.getElementById('pwa-install-banner')?.remove();
+        });
+    }
+}
+
+function dismissInstallBanner() {
+    document.getElementById('pwa-install-banner')?.remove();
+    localStorage.setItem('installDismissed', true);
+}
+
+// ============================================
+// TOUCH GESTURES FOR MOBILE
+// ============================================
+
+let touchStartX = 0;
+let touchEndX = 0;
+
+function initTouchGestures() {
+    const container = document.querySelector('.container');
+    if (!container) return;
+    
+    container.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    container.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    });
+    
+    const buttons = document.querySelectorAll('.btn, .mood-btn, .task-tag-remove, .distraction-tag-remove');
+    buttons.forEach(btn => {
+        btn.addEventListener('touchstart', () => {
+            if (navigator.vibrate) navigator.vibrate(10);
+        });
+    });
+}
+
+function handleSwipe() {
+    const deltaX = touchEndX - touchStartX;
+    
+    if (Math.abs(deltaX) > 50) {
+        if (deltaX > 0) {
+            if (document.getElementById('history-screen') && 
+                !document.getElementById('history-screen').classList.contains('hidden')) {
+                backToDashboard();
+                if (navigator.vibrate) navigator.vibrate(50);
+            }
+        } else {
+            if (document.getElementById('main-screen') && 
+                !document.getElementById('main-screen').classList.contains('hidden')) {
+                showHistoryScreen();
+                if (navigator.vibrate) navigator.vibrate(50);
+            }
+        }
+    }
+}
+
+// ============================================
+// OFFLINE MODE INDICATOR
+// ============================================
+
+function initOfflineIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'offline-indicator';
+    indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#F59E0B;color:white;text-align:center;padding:10px;font-size:0.8rem;font-weight:600;z-index:10002;animation:slideInDown 0.3s ease-out;';
+    indicator.innerHTML = '📡 You are offline. Changes will save locally.';
+    indicator.classList.add('hidden');
+    document.body.appendChild(indicator);
+    
+    window.addEventListener('online', () => {
+        indicator.classList.add('hidden');
+        showAlert('🟢 Back online!', 'success');
+    });
+    
+    window.addEventListener('offline', () => {
+        indicator.classList.remove('hidden');
+        showAlert('🔴 You are offline. Entries will be saved locally.', 'warning');
+    });
+}
 
 // ============================================
 // EXPOSE FUNCTIONS TO GLOBAL SCOPE
@@ -1833,6 +2377,15 @@ window.downloadHistoryCSV = downloadHistoryCSV;
 window.showToolGuide = showToolGuide;
 window.closeToolGuide = closeToolGuide;
 window.showTerms = showTerms;
+window.installPWA = installPWA;
+window.dismissInstallBanner = dismissInstallBanner;
+window.exportUserData = exportUserData;
+window.importUserData = importUserData;
+window.closeBackupModal = closeBackupModal;
+window.showExportOptions = showExportOptions;
+window.closeExportModal = closeExportModal;
+window.exportWithOptions = exportWithOptions;
+window.updateExportButton = updateExportButton;
 
 // ============================================
 // INITIALIZATION
@@ -1840,13 +2393,14 @@ window.showTerms = showTerms;
 
 document.addEventListener('DOMContentLoaded', function() {
     initTheme();
+    checkMobileCompatibility();
+    initOfflineIndicator();
+    initTouchGestures();
     
-    // Setup auth
     checkRememberedUser();
     const hasSession = checkExistingSession();
     
     if (!hasSession) {
-        // Show login screen
         document.getElementById("login-screen").classList.remove("hidden");
         document.getElementById("main-screen").classList.add("hidden");
         document.getElementById("history-screen").classList.add("hidden");
@@ -1857,7 +2411,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (Notification.permission === "granted") { 
         notificationPermissionGranted = true; 
-        setupReminderSystem(); 
+        setupLocalNotifications(); 
     }
     
     updateAutoProductivityDisplay();
