@@ -1,11 +1,12 @@
 // script.js
 // ============================================
 // CHIMLA TABDEW - MULTI-TASK BLOCK ASSIGNMENT SYSTEM
+// WITH USER AUTHENTICATION
 // ============================================
 
 // State Management
 let taskList = [];
-let currentUser = "Penjor";
+let currentUser = null;
 let filteredHistoryData = [];
 let productivityChart = null;
 let moodChart = null;
@@ -41,6 +42,349 @@ const distractionTypes = [
     { value: "😴 Fatigue", label: "😴 Fatigue" },
     { value: "✨ Other", label: "✨ Other" }
 ];
+
+// ============================================
+// USER AUTHENTICATION SYSTEM
+// ============================================
+
+function getUsers() {
+    const users = localStorage.getItem('chimla_users');
+    return users ? JSON.parse(users) : {};
+}
+
+function saveUsers(users) {
+    localStorage.setItem('chimla_users', JSON.stringify(users));
+}
+
+function switchAuthTab(tab) {
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    const tabs = document.querySelectorAll('.auth-tab');
+    
+    if (tab === 'login') {
+        loginForm.classList.add('active');
+        signupForm.classList.remove('active');
+        tabs[0].classList.add('active');
+        tabs[1].classList.remove('active');
+        clearLoginError();
+    } else {
+        signupForm.classList.add('active');
+        loginForm.classList.remove('active');
+        tabs[1].classList.add('active');
+        tabs[0].classList.remove('active');
+    }
+}
+
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+    }
+}
+
+function validateUsername(username) {
+    if (!username) return 'Username is required';
+    if (username.length < 3) return 'Username must be at least 3 characters';
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return 'Only letters, numbers, and underscores allowed';
+    return null;
+}
+
+function validatePassword(password) {
+    if (!password) return 'Password is required';
+    if (password.length < 4) return 'Password must be at least 4 characters';
+    return null;
+}
+
+// Check username availability in real-time
+document.addEventListener('DOMContentLoaded', function() {
+    const usernameInput = document.getElementById('signup-username');
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function() {
+            const username = this.value;
+            const hint = document.getElementById('username-hint');
+            const users = getUsers();
+            
+            if (username.length < 3) {
+                hint.textContent = '⏳ Min 3 characters';
+                hint.className = 'input-hint';
+            } else if (users[username]) {
+                hint.textContent = '❌ Username already taken';
+                hint.className = 'input-hint error';
+            } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                hint.textContent = '❌ Only letters, numbers, and underscores';
+                hint.className = 'input-hint error';
+            } else {
+                hint.textContent = '✅ Username available';
+                hint.className = 'input-hint success';
+            }
+        });
+    }
+});
+
+function signupUser() {
+    const fullname = document.getElementById('signup-fullname').value.trim();
+    const username = document.getElementById('signup-username').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const confirmPassword = document.getElementById('signup-confirm').value;
+    const termsChecked = document.getElementById('terms-checkbox').checked;
+    
+    // Validation
+    if (!fullname) {
+        showAlert('Please enter your full name', 'error');
+        addShakeAnimation(document.getElementById('signup-fullname'));
+        return;
+    }
+    
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+        showAlert(usernameError, 'error');
+        addShakeAnimation(document.getElementById('signup-username'));
+        return;
+    }
+    
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+        showAlert(passwordError, 'error');
+        addShakeAnimation(document.getElementById('signup-password'));
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        showAlert('Passwords do not match', 'error');
+        addShakeAnimation(document.getElementById('signup-confirm'));
+        return;
+    }
+    
+    if (!termsChecked) {
+        showAlert('Please agree to the Terms of Service', 'error');
+        addShakeAnimation(document.getElementById('terms-checkbox'));
+        return;
+    }
+    
+    const users = getUsers();
+    
+    if (users[username]) {
+        showAlert('Username already exists! Please choose another.', 'error');
+        addShakeAnimation(document.getElementById('signup-username'));
+        return;
+    }
+    
+    // Create new user
+    const userId = 'user_' + Date.now();
+    users[username] = {
+        id: userId,
+        fullname: fullname,
+        username: username,
+        password: btoa(password),
+        createdAt: new Date().toISOString(),
+        avatar: getRandomAvatar(),
+        settings: {
+            theme: 'auto',
+            dailyReminder: false,
+            reminderTime: '20:00'
+        }
+    };
+    
+    saveUsers(users);
+    
+    // Create empty history for new user
+    const userHistoryKey = `chimla_history_${username}`;
+    if (!localStorage.getItem(userHistoryKey)) {
+        localStorage.setItem(userHistoryKey, JSON.stringify([]));
+    }
+    
+    showAlert(`✅ Account created successfully! Welcome ${fullname}!`, 'success');
+    triggerConfetti();
+    
+    // Auto login after signup
+    setTimeout(() => {
+        performLogin(username, password);
+    }, 500);
+}
+
+function getRandomAvatar() {
+    const avatars = ['👨‍💻', '👩‍💻', '🧑‍💻', '🌟', '🎯', '📊', '⚡', '🎨', '🚀', '💪'];
+    return avatars[Math.floor(Math.random() * avatars.length)];
+}
+
+function loginUser() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const rememberMe = document.getElementById('remember-me')?.checked || false;
+    
+    if (!username) {
+        showLoginError('Please enter your username');
+        addShakeAnimation(document.getElementById('login-username'));
+        return;
+    }
+    
+    if (!password) {
+        showLoginError('Please enter your password');
+        addShakeAnimation(document.getElementById('login-password'));
+        return;
+    }
+    
+    performLogin(username, password, rememberMe);
+}
+
+function performLogin(username, password, rememberMe = false) {
+    const users = getUsers();
+    const user = users[username];
+    
+    if (!user) {
+        showLoginError('Username not found. Please create an account first.');
+        addShakeAnimation(document.getElementById('login-username'));
+        return;
+    }
+    
+    // Verify password (simple btoa encoding)
+    if (user.password !== btoa(password)) {
+        showLoginError('Incorrect password. Please try again.');
+        addShakeAnimation(document.getElementById('login-password'));
+        return;
+    }
+    
+    // Login successful
+    currentUser = user;
+    
+    if (rememberMe) {
+        localStorage.setItem('chimla_remembered_user', JSON.stringify({
+            username: user.username,
+            remember: true
+        }));
+    } else {
+        localStorage.removeItem('chimla_remembered_user');
+    }
+    
+    // Store session
+    sessionStorage.setItem('chimla_current_user', JSON.stringify(user));
+    
+    // Load user-specific data
+    loadUserData(user.username);
+    
+    // Show success and proceed
+    showAlert(`🎉 Welcome back, ${user.fullname}!`, 'success');
+    
+    // Update UI with user info
+    updateDashboardUserInfo(user);
+    
+    // Hide login screen, show dashboard
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("main-screen").classList.remove("hidden");
+    
+    // Initialize dashboard
+    document.getElementById("greeting-name").textContent = user.fullname.split(' ')[0];
+    document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
+    document.getElementById('daily-quote').textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
+    
+    setTimeout(() => { 
+        autoGenerateBlocksManual(); 
+        renderDistractionTrackerUI(); 
+    }, 100);
+    
+    setupEventListeners();
+    
+    if (Notification.permission === "granted") { 
+        showReminderSettings(); 
+        setupReminderSystem(); 
+    }
+    
+    addWorkTimeSuggestionCard();
+}
+
+function showLoginError(message) {
+    clearLoginError();
+    
+    const loginForm = document.getElementById('login-form');
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'login-error';
+    errorDiv.textContent = message;
+    loginForm.insertBefore(errorDiv, loginForm.firstChild);
+    
+    setTimeout(() => {
+        errorDiv.remove();
+    }, 3000);
+}
+
+function clearLoginError() {
+    const existingError = document.querySelector('.login-error');
+    if (existingError) existingError.remove();
+}
+
+function loadUserData(username) {
+    // Override the global getHistory function for this user
+    window.getHistory = function() {
+        const history = localStorage.getItem(`chimla_history_${username}`);
+        return history ? JSON.parse(history) : [];
+    };
+    
+    // Load initial data
+    const history = window.getHistory();
+    if (history.length > 0) {
+        permanentHistoryBackup = [...history];
+    }
+    
+    // Load user settings
+    const users = getUsers();
+    const user = users[username];
+    if (user && user.settings) {
+        if (user.settings.theme) applyTheme(user.settings.theme);
+        if (user.settings.dailyReminder) {
+            document.getElementById('daily-reminder-toggle').checked = true;
+        }
+    }
+}
+
+function updateDashboardUserInfo(user) {
+    const headerContent = document.querySelector('.header-content');
+    if (headerContent && !document.querySelector('.user-info')) {
+        const userInfoDiv = document.createElement('div');
+        userInfoDiv.className = 'user-info';
+        userInfoDiv.innerHTML = `
+            <div class="user-details">
+                <div class="user-name">${escapeHtml(user.fullname)}</div>
+                <div class="user-status">@${escapeHtml(user.username)}</div>
+            </div>
+            <div class="user-avatar">${user.avatar}</div>
+        `;
+        headerContent.appendChild(userInfoDiv);
+    }
+}
+
+function checkRememberedUser() {
+    const remembered = localStorage.getItem('chimla_remembered_user');
+    if (remembered) {
+        try {
+            const { username } = JSON.parse(remembered);
+            if (username) {
+                document.getElementById('login-username').value = username;
+                document.getElementById('remember-me').checked = true;
+            }
+        } catch(e) {}
+    }
+}
+
+function checkExistingSession() {
+    const savedSession = sessionStorage.getItem('chimla_current_user');
+    if (savedSession) {
+        try {
+            const user = JSON.parse(savedSession);
+            if (user && user.username) {
+                performLogin(user.username, atob(user.password), false);
+                return true;
+            }
+        } catch(e) {}
+    }
+    return false;
+}
+
+function showTerms() {
+    showAlert('Terms: Use responsibly. Your data stays private on your device.', 'info');
+}
 
 // ============================================
 // ANIMATION & MICRO-INTERACTION FUNCTIONS
@@ -103,7 +447,6 @@ function triggerConfetti() {
         }, 3000);
     }
     
-    // Also show a celebration message
     const celebration = document.createElement('div');
     celebration.className = 'celebration-message';
     celebration.innerHTML = '🎉 Amazing! High Productivity Day! 🎉';
@@ -659,7 +1002,6 @@ function addTask() {
         renderDistractionTrackerUI();
         blockAssignmentFinished = false;
         document.getElementById('assignmentStatusMsg').innerHTML = '';
-        // Add a small bounce animation to the task list
         const taskListElement = document.getElementById('task-checklist');
         if (taskListElement) {
             taskListElement.classList.add('task-bounce');
@@ -697,35 +1039,40 @@ function removeTask(index) {
 }
 
 // ============================================
-// LOGIN/LOGOUT
+// LOGIN/LOGOUT (UPDATED)
 // ============================================
 
-function login() {
-    const name = document.getElementById("username").value.trim();
-    if (name) currentUser = name;
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("main-screen").classList.remove("hidden");
-    document.getElementById("greeting-name").textContent = currentUser;
-    document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
-    document.getElementById('daily-quote').textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
-    setTimeout(() => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); }, 100);
-    setupEventListeners();
-    if (Notification.permission === "granted") { showReminderSettings(); setupReminderSystem(); }
-    addWorkTimeSuggestionCard();
-}
-
 function logout() {
+    // Clear session
+    sessionStorage.removeItem('chimla_current_user');
+    currentUser = null;
+    
+    // Reset to login screen
     document.getElementById("main-screen").classList.add("hidden");
     document.getElementById("history-screen").classList.add("hidden");
     document.getElementById("login-screen").classList.remove("hidden");
-    document.getElementById("username").value = currentUser;
+    
+    // Clear forms
+    document.getElementById("login-username").value = '';
+    document.getElementById("login-password").value = '';
+    document.getElementById("signup-fullname").value = '';
+    document.getElementById("signup-username").value = '';
+    document.getElementById("signup-password").value = '';
+    document.getElementById("signup-confirm").value = '';
+    document.getElementById("terms-checkbox").checked = false;
+    
+    // Reset global state
     taskList = [];
     blockTasksMap = {};
     blockCompletionMap = {};
     blockRatingMap = {};
     distractionLogs = {};
     blockAssignmentFinished = false;
-    updateAutoProductivityDisplay();
+    
+    // Switch to login tab
+    switchAuthTab('login');
+    
+    showAlert('👋 Logged out successfully!', 'success');
 }
 
 function setupEventListeners() {
@@ -741,10 +1088,15 @@ function setupEventListeners() {
 }
 
 // ============================================
-// SAVE ENTRY (UPDATED - Saves ALL block and distraction data)
+// SAVE ENTRY (UPDATED - User specific)
 // ============================================
 
 function saveEntry() {
+    if (!currentUser) {
+        showAlert('Please login first', 'error');
+        return;
+    }
+    
     const saveButton = document.getElementById('saveEntryBtn');
     addPulseAnimation(saveButton);
     
@@ -770,12 +1122,10 @@ function saveEntry() {
     const autoScore = calculateAutoProductivityScore();
     const finalProductivity = autoScore !== null ? autoScore : 5;
     
-    // Trigger confetti for high productivity day (score >= 8)
     if (finalProductivity >= 8) {
         triggerConfetti();
     }
     
-    // Save ALL block multi-tasks data with ratings
     const blockMultiTasksData = {};
     for (let i = 0; i < blocksCount; i++) {
         if (blockTasksMap[i]) {
@@ -786,7 +1136,6 @@ function saveEntry() {
         }
     }
     
-    // Save ALL distraction data
     const distractionData = {};
     for (let i = 0; i < blocksCount; i++) {
         if (distractionLogs[i] && distractionLogs[i].length > 0) {
@@ -794,7 +1143,6 @@ function saveEntry() {
         }
     }
     
-    // Create complete entry with ALL data
     const entry = {
         timestamp: new Date().toISOString(),
         date: new Date().toLocaleDateString('en-GB'),
@@ -812,11 +1160,10 @@ function saveEntry() {
     
     let history = getHistory();
     history.push(entry);
-    localStorage.setItem('productivity_history', JSON.stringify(history));
-
-    // Update permanent backup
+    localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify(history));
+    
     permanentHistoryBackup = [...history];
-
+    
     showAlert(`✅ Entry saved successfully! Productivity score: ${finalProductivity}/10`, 'success');
     resetForm();
 }
@@ -842,9 +1189,10 @@ function resetForm() {
     updateDistractionPatterns();
 }
 
-// UPDATED getHistory function
+// getHistory function (overridden by user system)
 function getHistory() { 
-    const stored = localStorage.getItem('productivity_history'); 
+    if (!currentUser) return [];
+    const stored = localStorage.getItem(`chimla_history_${currentUser.username}`); 
     if (!stored) return [];
     return JSON.parse(stored); 
 }
@@ -867,12 +1215,11 @@ function backToDashboard() {
 function loadHistoryData() {
     const history = getHistory();
     filteredHistoryData = history;
-
-    // Keep permanent backup updated
+    
     if (history.length > 0) {
         permanentHistoryBackup = [...history];
     }
-
+    
     displayStats();
     displayHistory();
     loadProductivityTrendChart();
@@ -1079,7 +1426,9 @@ function resetFilters() {
 
 function clearAllHistory() {
     if (confirm('⚠️ Are you sure? This will clear history from the app, but your backup will still be available for CSV download.')) {
-        localStorage.removeItem('productivity_history');
+        if (currentUser) {
+            localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify([]));
+        }
         filteredHistoryData = [];
         showAlert('🗑️ History cleared from app. Backup preserved for download.', 'success');
         loadHistoryData();
@@ -1149,7 +1498,7 @@ function downloadHistoryCSV() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `Chimla_Tabdew_Full_History_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute("download", `Chimla_Tabdew_${currentUser ? currentUser.username : 'User'}_History_${new Date().toISOString().slice(0,10)}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1453,8 +1802,11 @@ window.toggleTheme = toggleTheme;
 window.setMood = setMood;
 window.addTask = addTask;
 window.removeTask = removeTask;
-window.login = login;
+window.loginUser = loginUser;
+window.signupUser = signupUser;
 window.logout = logout;
+window.switchAuthTab = switchAuthTab;
+window.togglePassword = togglePassword;
 window.showHistoryScreen = showHistoryScreen;
 window.backToDashboard = backToDashboard;
 window.saveEntry = saveEntry;
@@ -1480,6 +1832,7 @@ window.handleDistractionSelectChange = handleDistractionSelectChange;
 window.downloadHistoryCSV = downloadHistoryCSV;
 window.showToolGuide = showToolGuide;
 window.closeToolGuide = closeToolGuide;
+window.showTerms = showTerms;
 
 // ============================================
 // INITIALIZATION
@@ -1487,15 +1840,25 @@ window.closeToolGuide = closeToolGuide;
 
 document.addEventListener('DOMContentLoaded', function() {
     initTheme();
+    
+    // Setup auth
+    checkRememberedUser();
+    const hasSession = checkExistingSession();
+    
+    if (!hasSession) {
+        // Show login screen
+        document.getElementById("login-screen").classList.remove("hidden");
+        document.getElementById("main-screen").classList.add("hidden");
+        document.getElementById("history-screen").classList.add("hidden");
+    }
+    
     const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
     if (defaultMoodBtn) defaultMoodBtn.classList.add('active');
+    
     if (Notification.permission === "granted") { 
         notificationPermissionGranted = true; 
         setupReminderSystem(); 
     }
+    
     updateAutoProductivityDisplay();
-
-    // Load backup on start
-    const saved = getHistory();
-    if (saved.length > 0) permanentHistoryBackup = [...saved];
 });
