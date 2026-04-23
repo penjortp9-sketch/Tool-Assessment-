@@ -2,6 +2,7 @@
 // ============================================
 // CHIMLA TABDEW - MULTI-TASK BLOCK ASSIGNMENT SYSTEM
 // WITH USER AUTHENTICATION & ENHANCED EXCEL EXPORT
+// WITH PERSISTENT SAVE & AUTO-SAVE ENTRY
 // ============================================
 
 // State Management
@@ -25,7 +26,7 @@ let blockAssignmentFinished = false;
 // Distraction Tracker State
 let distractionLogs = {};
 
-// NEW: Permanent backup for CSV download (survives Clear All)
+// Permanent backup for CSV download
 let permanentHistoryBackup = [];
 
 // Predefined distraction types
@@ -99,7 +100,6 @@ function validatePassword(password) {
     return null;
 }
 
-// Check username availability in real-time
 document.addEventListener('DOMContentLoaded', function() {
     const usernameInput = document.getElementById('signup-username');
     if (usernameInput) {
@@ -132,7 +132,6 @@ function signupUser() {
     const confirmPassword = document.getElementById('signup-confirm').value;
     const termsChecked = document.getElementById('terms-checkbox').checked;
     
-    // Validation
     if (!fullname) {
         showAlert('Please enter your full name', 'error');
         addShakeAnimation(document.getElementById('signup-fullname'));
@@ -173,7 +172,6 @@ function signupUser() {
         return;
     }
     
-    // Create new user
     const userId = 'user_' + Date.now();
     users[username] = {
         id: userId,
@@ -191,7 +189,6 @@ function signupUser() {
     
     saveUsers(users);
     
-    // Create empty history for new user
     const userHistoryKey = `chimla_history_${username}`;
     if (!localStorage.getItem(userHistoryKey)) {
         localStorage.setItem(userHistoryKey, JSON.stringify([]));
@@ -200,7 +197,6 @@ function signupUser() {
     showAlert(`✅ Account created successfully! Welcome ${fullname}!`, 'success');
     triggerConfetti();
     
-    // Auto login after signup
     setTimeout(() => {
         performLogin(username, password);
     }, 500);
@@ -241,14 +237,12 @@ function performLogin(username, password, rememberMe = false) {
         return;
     }
     
-    // Verify password (simple btoa encoding)
     if (user.password !== btoa(password)) {
         showLoginError('Incorrect password. Please try again.');
         addShakeAnimation(document.getElementById('login-password'));
         return;
     }
     
-    // Login successful
     currentUser = user;
     
     if (rememberMe) {
@@ -260,26 +254,23 @@ function performLogin(username, password, rememberMe = false) {
         localStorage.removeItem('chimla_remembered_user');
     }
     
-    // Store session
     sessionStorage.setItem('chimla_current_user', JSON.stringify(user));
     
-    // Load user-specific data
     loadUserData(user.username);
     
-    // Show success and proceed
     showAlert(`🎉 Welcome back, ${user.fullname}!`, 'success');
     
-    // Update UI with user info
     updateDashboardUserInfo(user);
     
-    // Hide login screen, show dashboard
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("main-screen").classList.remove("hidden");
     
-    // Initialize dashboard
     document.getElementById("greeting-name").textContent = user.fullname.split(' ')[0];
     document.getElementById("current-date").textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
     document.getElementById('daily-quote').textContent = `"${quotes[Math.floor(Math.random() * quotes.length)]}"`;
+    
+    // Load saved persistent data
+    loadPersistentData();
     
     setTimeout(() => { 
         autoGenerateBlocksManual(); 
@@ -318,19 +309,16 @@ function clearLoginError() {
 }
 
 function loadUserData(username) {
-    // Override the global getHistory function for this user
     window.getHistory = function() {
         const history = localStorage.getItem(`chimla_history_${username}`);
         return history ? JSON.parse(history) : [];
     };
     
-    // Load initial data
     const history = window.getHistory();
     if (history.length > 0) {
         permanentHistoryBackup = [...history];
     }
     
-    // Load user settings
     const users = getUsers();
     const user = users[username];
     if (user && user.settings) {
@@ -389,7 +377,96 @@ function showTerms() {
 }
 
 // ============================================
-// ANIMATION & MICRO-INTERACTION FUNCTIONS
+// PERSISTENT DATA STORAGE
+// ============================================
+
+function savePersistentData() {
+    if (!currentUser) return;
+    
+    const persistentData = {
+        taskList: taskList,
+        blockTasksMap: blockTasksMap,
+        blockCompletionMap: blockCompletionMap,
+        blockRatingMap: blockRatingMap,
+        distractionLogs: distractionLogs,
+        mood: document.getElementById('selected-mood')?.value || '😊',
+        totalHours: document.getElementById('total-hours')?.value || '6',
+        blocks: document.getElementById('blocks')?.value || '3',
+        blockTasksRaw: document.getElementById('block-tasks')?.value || '',
+        comments: document.getElementById('comments')?.value || '',
+        lastSaved: new Date().toISOString(),
+        isCompleted: false
+    };
+    
+    localStorage.setItem(`chimla_persistent_${currentUser.username}`, JSON.stringify(persistentData));
+}
+
+function loadPersistentData() {
+    if (!currentUser) return false;
+    
+    const savedData = localStorage.getItem(`chimla_persistent_${currentUser.username}`);
+    if (!savedData) return false;
+    
+    try {
+        const data = JSON.parse(savedData);
+        
+        if (data.isCompleted) {
+            return false;
+        }
+        
+        const hasData = (data.taskList && data.taskList.length > 0) || 
+                        Object.keys(data.blockTasksMap || {}).length > 0;
+        
+        if (!hasData) return false;
+        
+        if (data.taskList && Array.isArray(data.taskList) && data.taskList.length > 0) {
+            taskList = data.taskList;
+            updateTaskListUI();
+            document.getElementById('tasks').value = taskList.join(', ');
+        }
+        
+        if (data.blockTasksMap) blockTasksMap = data.blockTasksMap;
+        if (data.blockCompletionMap) blockCompletionMap = data.blockCompletionMap;
+        if (data.blockRatingMap) blockRatingMap = data.blockRatingMap;
+        if (data.distractionLogs) distractionLogs = data.distractionLogs;
+        
+        if (data.mood) {
+            document.getElementById('selected-mood').value = data.mood;
+            document.querySelectorAll('.mood-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-mood') === data.mood) btn.classList.add('active');
+            });
+        }
+        if (data.totalHours) document.getElementById('total-hours').value = data.totalHours;
+        if (data.blocks) document.getElementById('blocks').value = data.blocks;
+        if (data.blockTasksRaw) document.getElementById('block-tasks').value = data.blockTasksRaw;
+        if (data.comments) document.getElementById('comments').value = data.comments;
+        
+        const restoreMsg = document.createElement('div');
+        restoreMsg.style.cssText = `
+            position: fixed; top: 100px; right: 20px; background: #10B981; color: white;
+            padding: 12px 20px; border-radius: 12px; z-index: 10007;
+            animation: slideInDown 0.3s ease-out; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        `;
+        restoreMsg.innerHTML = `📋 Restored your pending tasks from ${new Date(data.lastSaved).toLocaleTimeString()}`;
+        document.body.appendChild(restoreMsg);
+        setTimeout(() => restoreMsg.remove(), 4000);
+        
+        return true;
+    } catch(e) {
+        console.error('Error loading persistent data:', e);
+        return false;
+    }
+}
+
+function clearPersistentData() {
+    if (!currentUser) return;
+    localStorage.removeItem(`chimla_persistent_${currentUser.username}`);
+}
+
+// ============================================
+// ANIMATION FUNCTIONS
 // ============================================
 
 function addPulseAnimation(element) {
@@ -458,7 +535,6 @@ function triggerConfetti() {
     }, 2500);
 }
 
-// Add ripple to all buttons
 document.addEventListener('click', function(e) {
     const button = e.target.closest('.btn, .btn-primary, .btn-secondary, .btn-icon, .btn-sm, .btn-rate-block, .btn-complete-block');
     if (button && !button.classList.contains('no-ripple')) {
@@ -467,7 +543,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ============================================
-// TOOL GUIDE MODAL FUNCTIONS
+// TOOL GUIDE MODAL
 // ============================================
 
 function showToolGuide() {
@@ -485,7 +561,6 @@ function closeToolGuide() {
     }
 }
 
-// Close modal when clicking outside
 document.addEventListener('click', function(event) {
     const modal = document.getElementById('tool-guide-modal');
     const infoBox = document.querySelector('.info-box');
@@ -498,7 +573,7 @@ document.addEventListener('click', function(event) {
 });
 
 // ============================================
-// DARK/LIGHT MODE TOGGLE
+// DARK/LIGHT MODE
 // ============================================
 
 function applyTheme(theme) {
@@ -572,6 +647,7 @@ function setMood(mood, btn) {
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     if (navigator.vibrate) navigator.vibrate(50);
+    savePersistentData();
 }
 
 function showAlert(msg, type = "info") {
@@ -630,16 +706,22 @@ function autoGenerateBlocksManual() {
     document.getElementById("block-tasks").value = blockLabels.join(", ");
     document.getElementById("block-tasks").style.borderColor = '#10B981';
     setTimeout(() => document.getElementById("block-tasks").style.borderColor = '', 1500);
-    blockTasksMap = {};
-    blockCompletionMap = {};
-    blockRatingMap = {};
-    distractionLogs = {};
-    blockAssignmentFinished = false;
-    document.getElementById('assignmentStatusMsg').innerHTML = '';
+    
+    const hasData = Object.keys(blockTasksMap).length > 0 || taskList.length > 0;
+    if (!hasData) {
+        blockTasksMap = {};
+        blockCompletionMap = {};
+        blockRatingMap = {};
+        distractionLogs = {};
+        blockAssignmentFinished = false;
+        document.getElementById('assignmentStatusMsg').innerHTML = '';
+    }
+    
     renderBlockAssignmentUI();
     renderDistractionTrackerUI();
     updateAutoProductivityDisplay();
     updateDistractionPatterns();
+    savePersistentData();
 }
 
 function parseAndUpdateBlockTimes() {
@@ -659,6 +741,7 @@ function parseAndUpdateBlockTimes() {
         updatedBlocks.push(`${blockName} (${time}h)`);
     });
     document.getElementById('block-tasks').value = updatedBlocks.join(", ");
+    savePersistentData();
 }
 
 function getBlockNameByIndex(idx) {
@@ -691,6 +774,7 @@ function addTaskToBlock(blockIdx) {
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
     showAlert(`✅ Added "${selectedTask}" to Block ${blockIdx + 1}`, "success");
+    savePersistentData();
 }
 
 function removeTaskFromBlock(blockIdx, taskIdx) {
@@ -707,6 +791,7 @@ function removeTaskFromBlock(blockIdx, taskIdx) {
         renderBlockAssignmentUI();
         updateAutoProductivityDisplay();
         showAlert(`🗑️ Removed "${removedTask}" from Block ${blockIdx + 1}`, "warning");
+        savePersistentData();
     }
 }
 
@@ -726,6 +811,8 @@ function markBlockCompleted(blockIdx) {
     }
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
+    savePersistentData();
+    checkAndTriggerAutoSave();
 }
 
 function showRatingModalForBlock(blockIdx) {
@@ -770,6 +857,8 @@ function saveBlockRatings(blockIdx) {
     closeRatingModal();
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
+    savePersistentData();
+    checkAndTriggerAutoSave();
 }
 
 function closeRatingModal() { const existingModal = document.getElementById('rating-modal-overlay'); if (existingModal) existingModal.remove(); }
@@ -847,6 +936,7 @@ function resetAllBlockAssignments() {
         renderBlockAssignmentUI();
         updateAutoProductivityDisplay();
         showAlert('🔄 All block assignments and ratings have been reset', 'success');
+        savePersistentData();
     }
 }
 
@@ -900,6 +990,7 @@ function addSelectedDistraction(blockIdx) {
     renderDistractionTrackerUI();
     updateDistractionPatterns();
     showAlert(`🚫 Added distraction: ${select.options[select.selectedIndex]?.text || select.value}`, "success");
+    savePersistentData();
 }
 
 function addCustomDistraction(blockIdx) {
@@ -917,6 +1008,7 @@ function addCustomDistraction(blockIdx) {
     renderDistractionTrackerUI();
     updateDistractionPatterns();
     showAlert(`🚫 Added custom distraction: ${customText}`, "success");
+    savePersistentData();
 }
 
 function removeDistraction(blockIdx, distractionIdx) {
@@ -925,6 +1017,7 @@ function removeDistraction(blockIdx, distractionIdx) {
         renderDistractionTrackerUI();
         updateDistractionPatterns();
         showAlert(`🗑️ Removed distraction`, "warning");
+        savePersistentData();
     }
 }
 
@@ -1009,6 +1102,7 @@ function addTask() {
             taskListElement.classList.add('task-bounce');
             setTimeout(() => taskListElement.classList.remove('task-bounce'), 300);
         }
+        savePersistentData();
     } else {
         addShakeAnimation(input);
         showAlert("Please enter a task", "warning");
@@ -1038,59 +1132,162 @@ function removeTask(index) {
     renderBlockAssignmentUI();
     updateAutoProductivityDisplay();
     showAlert(`🗑️ Removed "${removedTask}"`, "warning");
+    savePersistentData();
 }
 
 // ============================================
-// LOGIN/LOGOUT (UPDATED)
+// AUTO-SAVE ENTRY WHEN ALL BLOCKS COMPLETED AND RATED
 // ============================================
 
-function logout() {
-    // Clear session
-    sessionStorage.removeItem('chimla_current_user');
-    currentUser = null;
+function checkAndTriggerAutoSave() {
+    if (!currentUser) return;
     
-    // Reset to login screen
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("history-screen").classList.add("hidden");
-    document.getElementById("login-screen").classList.remove("hidden");
+    const blocksCount = parseInt(document.getElementById('blocks')?.value) || 1;
     
-    // Clear forms
-    document.getElementById("login-username").value = '';
-    document.getElementById("login-password").value = '';
-    document.getElementById("signup-fullname").value = '';
-    document.getElementById("signup-username").value = '';
-    document.getElementById("signup-password").value = '';
-    document.getElementById("signup-confirm").value = '';
-    document.getElementById("terms-checkbox").checked = false;
+    // Check if all blocks have tasks
+    let hasMissingTasks = false;
+    for (let i = 0; i < blocksCount; i++) {
+        if (!blockTasksMap[i] || blockTasksMap[i].length === 0) {
+            hasMissingTasks = true;
+            break;
+        }
+    }
+    if (hasMissingTasks) return;
     
-    // Reset global state
+    // Check if all blocks are completed AND all tasks are rated
+    let allCompleted = true;
+    let allRated = true;
+    for (let i = 0; i < blocksCount; i++) {
+        if (!blockCompletionMap[i]) {
+            allCompleted = false;
+            break;
+        }
+        if (blockTasksMap[i]) {
+            const hasUnratedTask = blockTasksMap[i].some(task => !task.rating);
+            if (hasUnratedTask) allRated = false;
+        }
+    }
+    
+    console.log("Auto-save check - All completed:", allCompleted, "All rated:", allRated);
+    
+    // Auto-save when ALL blocks are completed AND all tasks are rated
+    if (allCompleted && allRated) {
+        // Check if already auto-saved today
+        const today = new Date().toLocaleDateString();
+        const lastAutoSaveKey = `chimla_autosave_${currentUser.username}_${today}`;
+        if (localStorage.getItem(lastAutoSaveKey)) {
+            console.log("Already auto-saved today, skipping");
+            return;
+        }
+        
+        console.log("TRIGGERING AUTO-SAVE!");
+        
+        // Show auto-save notification
+        const autoSaveMsg = document.createElement('div');
+        autoSaveMsg.style.cssText = `
+            position: fixed; top: 20px; right: 20px; background: #10B981; color: white;
+            padding: 12px 20px; border-radius: 12px; z-index: 10007;
+            animation: slideInDown 0.3s ease-out; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        `;
+        autoSaveMsg.innerHTML = '✨ All blocks completed and rated! Auto-saving entry... ✨';
+        document.body.appendChild(autoSaveMsg);
+        setTimeout(() => autoSaveMsg.remove(), 3000);
+        
+        // Perform auto-save
+        performAutoSave();
+        
+        // Mark that auto-save happened today
+        localStorage.setItem(lastAutoSaveKey, new Date().toISOString());
+    }
+}
+
+function performAutoSave() {
+    if (!currentUser) return;
+    
+    const blocksCount = parseInt(document.getElementById('blocks').value) || 1;
+    
+    const autoScore = calculateAutoProductivityScore();
+    const finalProductivity = autoScore !== null ? autoScore : 5;
+    
+    if (finalProductivity >= 8) {
+        triggerConfetti();
+    }
+    
+    const blockMultiTasksData = {};
+    for (let i = 0; i < blocksCount; i++) {
+        if (blockTasksMap[i]) {
+            blockMultiTasksData[i] = blockTasksMap[i].map(t => ({ 
+                taskName: t.taskName, 
+                rating: t.rating 
+            }));
+        }
+    }
+    
+    const distractionData = {};
+    for (let i = 0; i < blocksCount; i++) {
+        if (distractionLogs[i] && distractionLogs[i].length > 0) {
+            distractionData[i] = [...distractionLogs[i]];
+        }
+    }
+    
+    const entry = {
+        timestamp: new Date().toISOString(),
+        date: new Date().toLocaleDateString('en-GB'),
+        mood: document.getElementById('selected-mood').value,
+        tasks: taskList.join(', '),
+        totalHours: parseFloat(document.getElementById('total-hours').value),
+        blocks: blocksCount,
+        blockMultiTasks: blockMultiTasksData,
+        blockCompletionMap: JSON.parse(JSON.stringify(blockCompletionMap)),
+        blockRatingMap: JSON.parse(JSON.stringify(blockRatingMap)),
+        productivity: finalProductivity,
+        comments: document.getElementById('comments').value,
+        distractions: distractionData
+    };
+    
+    let history = getHistory();
+    history.push(entry);
+    localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify(history));
+    
+    permanentHistoryBackup = [...history];
+    
+    showAlert(`✅ Auto-saved! Productivity score: ${finalProductivity}/10`, 'success');
+    
+    // Clear persistent data after successful auto-save
+    clearPersistentData();
+    
+    // Reset form for next entry
+    resetFormAfterAutoSave();
+}
+
+function resetFormAfterAutoSave() {
+    document.getElementById('selected-mood').value = '😊';
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-mood="😊"]').classList.add('active');
     taskList = [];
+    updateTaskListUI();
+    document.getElementById('tasks').value = '';
+    document.getElementById('total-hours').value = '6';
+    document.getElementById('blocks').value = '3';
+    document.getElementById('comments').value = '';
     blockTasksMap = {};
     blockCompletionMap = {};
     blockRatingMap = {};
     distractionLogs = {};
     blockAssignmentFinished = false;
-    
-    // Switch to login tab
-    switchAuthTab('login');
-    
-    showAlert('👋 Logged out successfully!', 'success');
-}
-
-function setupEventListeners() {
-    const blocksInput = document.getElementById('blocks');
-    const hoursInput = document.getElementById('total-hours');
-    const blockTasksInput = document.getElementById('block-tasks');
-    if (blocksInput) blocksInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
-    if (hoursInput) hoursInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
-    if (blockTasksInput) {
-        blockTasksInput.addEventListener('change', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
-        blockTasksInput.addEventListener('blur', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
-    }
+    document.getElementById('assignmentStatusMsg').innerHTML = '';
+    setTimeout(() => { 
+        autoGenerateBlocksManual(); 
+        renderBlockAssignmentUI();
+        renderDistractionTrackerUI(); 
+    }, 100);
+    updateAutoProductivityDisplay();
+    updateDistractionPatterns();
 }
 
 // ============================================
-// SAVE ENTRY (UPDATED - User specific)
+// SAVE ENTRY (Manual save)
 // ============================================
 
 function saveEntry() {
@@ -1116,6 +1313,20 @@ function saveEntry() {
         showAlert(`⚠️ Please add tasks to Block(s) ${missingBlocks.join(', ')}.`, "error"); 
         return; 
     }
+    
+    let allRated = true;
+    for (let i = 0; i < blocksCount; i++) {
+        if (blockTasksMap[i]) {
+            const hasUnratedTask = blockTasksMap[i].some(task => !task.rating);
+            if (hasUnratedTask) allRated = false;
+        }
+    }
+    
+    if (!allRated) {
+        showAlert(`⚠️ Please rate all tasks in completed blocks before saving.`, "error");
+        return;
+    }
+    
     if (uncompletedBlocks.length > 0) { 
         showAlert(`⚠️ Please mark Block(s) ${uncompletedBlocks.join(', ')} as completed.`, "error"); 
         return; 
@@ -1167,6 +1378,8 @@ function saveEntry() {
     permanentHistoryBackup = [...history];
     
     showAlert(`✅ Entry saved successfully! Productivity score: ${finalProductivity}/10`, 'success');
+    
+    clearPersistentData();
     resetForm();
 }
 
@@ -1186,12 +1399,16 @@ function resetForm() {
     distractionLogs = {};
     blockAssignmentFinished = false;
     document.getElementById('assignmentStatusMsg').innerHTML = '';
-    setTimeout(() => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); }, 100);
+    setTimeout(() => { 
+        autoGenerateBlocksManual(); 
+        renderBlockAssignmentUI();
+        renderDistractionTrackerUI(); 
+    }, 100);
     updateAutoProductivityDisplay();
     updateDistractionPatterns();
+    savePersistentData();
 }
 
-// getHistory function (overridden by user system)
 function getHistory() { 
     if (!currentUser) return [];
     const stored = localStorage.getItem(`chimla_history_${currentUser.username}`); 
@@ -1199,8 +1416,42 @@ function getHistory() {
     return JSON.parse(stored); 
 }
 
+function setupEventListeners() {
+    const blocksInput = document.getElementById('blocks');
+    const hoursInput = document.getElementById('total-hours');
+    const blockTasksInput = document.getElementById('block-tasks');
+    if (blocksInput) blocksInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
+    if (hoursInput) hoursInput.addEventListener('change', () => { autoGenerateBlocksManual(); renderDistractionTrackerUI(); });
+    if (blockTasksInput) {
+        blockTasksInput.addEventListener('change', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
+        blockTasksInput.addEventListener('blur', () => { parseAndUpdateBlockTimes(); renderDistractionTrackerUI(); });
+    }
+}
+
+function logout() {
+    sessionStorage.removeItem('chimla_current_user');
+    currentUser = null;
+    document.getElementById("main-screen").classList.add("hidden");
+    document.getElementById("history-screen").classList.add("hidden");
+    document.getElementById("login-screen").classList.remove("hidden");
+    document.getElementById("login-username").value = '';
+    document.getElementById("login-password").value = '';
+    document.getElementById("signup-fullname").value = '';
+    document.getElementById("signup-username").value = '';
+    document.getElementById("signup-password").value = '';
+    document.getElementById("signup-confirm").value = '';
+    document.getElementById("terms-checkbox").checked = false;
+    taskList = [];
+    blockTasksMap = {};
+    blockCompletionMap = {};
+    blockRatingMap = {};
+    distractionLogs = {};
+    switchAuthTab('login');
+    showAlert('👋 Logged out!', 'success');
+}
+
 // ============================================
-// HISTORY SCREEN
+// HISTORY SCREEN FUNCTIONS
 // ============================================
 
 function showHistoryScreen() { 
@@ -1217,11 +1468,7 @@ function backToDashboard() {
 function loadHistoryData() {
     const history = getHistory();
     filteredHistoryData = history;
-    
-    if (history.length > 0) {
-        permanentHistoryBackup = [...history];
-    }
-    
+    if (history.length > 0) permanentHistoryBackup = [...history];
     displayStats();
     displayHistory();
     loadProductivityTrendChart();
@@ -1263,27 +1510,20 @@ function displayHistory() {
     list.innerHTML = history.slice().reverse().map((entry, idx) => {
         let distractionCount = 0;
         if (entry.distractions) Object.values(entry.distractions).forEach(distList => distractionCount += distList.length);
-        
-        let completedBlocks = 0;
-        let totalBlocks = 0;
+        let completedBlocks = 0, totalBlocks = 0;
         if (entry.blockCompletionMap) {
             totalBlocks = Object.keys(entry.blockCompletionMap).length;
             completedBlocks = Object.values(entry.blockCompletionMap).filter(v => v === true).length;
         }
-        
         let blockRatingSummary = '';
         if (entry.blockRatingMap && Object.keys(entry.blockRatingMap).length > 0) {
             const ratings = Object.values(entry.blockRatingMap);
             const avgRating = (ratings.reduce((a,b) => a + b, 0) / ratings.length).toFixed(1);
             blockRatingSummary = `<div class="quick-stat">⭐ Avg: ${avgRating}/10</div>`;
         }
-        
         return `<div class="history-item" onclick="showEntryDetail(${history.length - idx - 1})">
             <div class="history-item-header">
-                <div class="history-date">
-                    <span class="date-full">${entry.date}</span>
-                    <span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span>
-                </div>
+                <div class="history-date"><span class="date-full">${entry.date}</span><span class="date-time">${new Date(entry.timestamp).toLocaleTimeString()}</span></div>
                 <div class="history-mood">${entry.mood}</div>
             </div>
             <div class="history-quick-stats">
@@ -1315,10 +1555,7 @@ function showEntryDetail(idx) {
                 blockDetails += `<div style="padding: 12px; background: var(--bg-light); border-radius: 10px; margin-bottom: 12px; border-left: 4px solid ${entry.blockCompletionMap && entry.blockCompletionMap[i] ? '#10B981' : 'var(--primary)'};">
                     <strong style="color: var(--primary);">Block ${parseInt(i) + 1}:</strong><br>
                     ${tasks.map(t => `• ${escapeHtml(t.taskName)} ${t.rating ? `<span style="color: #10B981;">⭐${t.rating}/10</span>` : '<span style="color: #F59E0B;">📝 Not rated</span>'}`).join('<br>')}
-                    <div style="margin-top: 8px; font-size: 0.85rem;">
-                        <span style="color: var(--text-muted);">${completed}</span> | 
-                        <span style="color: var(--text-muted);">${avgRating}</span>
-                    </div>
+                    <div style="margin-top: 8px; font-size: 0.85rem;"><span style="color: var(--text-muted);">${completed}</span> | <span style="color: var(--text-muted);">${avgRating}</span></div>
                 </div>`;
             }
         }
@@ -1341,64 +1578,27 @@ function showEntryDetail(idx) {
         distractionDetails += '</div>';
     }
     
-    let completedBlocks = 0;
-    let totalBlocks = 0;
+    let completedBlocks = 0, totalBlocks = 0;
     if (entry.blockCompletionMap) {
         totalBlocks = Object.keys(entry.blockCompletionMap).length;
         completedBlocks = Object.values(entry.blockCompletionMap).filter(v => v === true).length;
     }
     
     detailContent.innerHTML = `
-        <div class="detail-header">
-            <h2 class="detail-title">${entry.date}</h2>
-            <p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p>
-        </div>
-        
+        <div class="detail-header"><h2 class="detail-title">${entry.date}</h2><p class="detail-time">${new Date(entry.timestamp).toLocaleTimeString()}</p></div>
         <div class="detail-grid">
-            <div class="detail-item">
-                <span class="detail-label">Mood</span>
-                <div class="detail-value">${entry.mood}</div>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Productivity</span>
-                <div class="detail-value" style="color: ${entry.productivity >= 8 ? '#10B981' : entry.productivity >= 5 ? '#F59E0B' : '#EF4444'};">${entry.productivity}/10</div>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Hours</span>
-                <div class="detail-value">${entry.totalHours}h</div>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Blocks</span>
-                <div class="detail-value">${entry.blocks}</div>
-            </div>
+            <div class="detail-item"><span class="detail-label">Mood</span><div class="detail-value">${entry.mood}</div></div>
+            <div class="detail-item"><span class="detail-label">Productivity</span><div class="detail-value" style="color: ${entry.productivity >= 8 ? '#10B981' : entry.productivity >= 5 ? '#F59E0B' : '#EF4444'};">${entry.productivity}/10</div></div>
+            <div class="detail-item"><span class="detail-label">Hours</span><div class="detail-value">${entry.totalHours}h</div></div>
+            <div class="detail-item"><span class="detail-label">Blocks</span><div class="detail-value">${entry.blocks}</div></div>
         </div>
-        
-        ${totalBlocks > 0 ? `<div class="detail-section" style="background: linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.05) 100%);">
-            <h3>📊 Block Completion</h3>
-            <div style="font-size: 1.2rem; font-weight: 700; color: var(--primary);">${completedBlocks}/${totalBlocks} Blocks Completed</div>
-            <div style="margin-top: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden;">
-                <div style="width: ${totalBlocks > 0 ? (completedBlocks/totalBlocks)*100 : 0}%; height: 8px; background: #10B981; transition: width 0.3s ease;"></div>
-            </div>
-        </div>` : ''}
-        
-        <div class="detail-section">
-            <h3>📋 All Tasks</h3>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                ${entry.tasks.split(',').map(t => `<span style="background: var(--bg-light); padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">${escapeHtml(t.trim())}</span>`).join('')}
-            </div>
-        </div>
-        
-        ${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details (Multi-Task)</h3>${blockDetails}</div>` : ''}
-        
+        ${totalBlocks > 0 ? `<div class="detail-section"><h3>📊 Block Completion</h3><div style="font-size: 1.2rem; font-weight: 700;">${completedBlocks}/${totalBlocks} Blocks Completed</div><div style="margin-top: 8px; background: var(--border-color); border-radius: 10px; overflow: hidden;"><div style="width: ${totalBlocks > 0 ? (completedBlocks/totalBlocks)*100 : 0}%; height: 8px; background: #10B981;"></div></div></div>` : ''}
+        <div class="detail-section"><h3>📋 All Tasks</h3><div style="display: flex; flex-wrap: wrap; gap: 8px;">${entry.tasks.split(',').map(t => `<span style="background: var(--bg-light); padding: 6px 12px; border-radius: 20px;">${escapeHtml(t.trim())}</span>`).join('')}</div></div>
+        ${blockDetails ? `<div class="detail-section"><h3>🎯 Block Details</h3>${blockDetails}</div>` : ''}
         ${distractionDetails}
-        
-        ${entry.comments ? `<div class="detail-section"><h3>💭 Notes & Reflections</h3><p style="line-height: 1.6;">${escapeHtml(entry.comments)}</p></div>` : ''}
-        
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); text-align: center;">
-            Logged on ${new Date(entry.timestamp).toLocaleString()}
-        </div>
+        ${entry.comments ? `<div class="detail-section"><h3>💭 Notes</h3><p>${escapeHtml(entry.comments)}</p></div>` : ''}
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color); font-size: 0.8rem; text-align: center;">Logged on ${new Date(entry.timestamp).toLocaleString()}</div>
     `;
-    
     document.getElementById('detail-modal').classList.remove('hidden');
 }
 
@@ -1427,284 +1627,11 @@ function resetFilters() {
 }
 
 function clearAllHistory() {
-    if (confirm('⚠️ Are you sure? This will clear history from the app, but your backup will still be available for CSV download.')) {
-        if (currentUser) {
-            localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify([]));
-        }
+    if (confirm('⚠️ Are you sure? This will clear history from the app.')) {
+        if (currentUser) localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify([]));
         filteredHistoryData = [];
-        showAlert('🗑️ History cleared from app. Backup preserved for download.', 'success');
+        showAlert('🗑️ History cleared.', 'success');
         loadHistoryData();
-    }
-}
-
-// ============================================
-// ENHANCED CSV/EXCEL EXPORT (UPDATED)
-// ============================================
-
-function downloadHistoryCSV() {
-    const historyToDownload = permanentHistoryBackup.length > 0 ? permanentHistoryBackup : getHistory();
-
-    if (historyToDownload.length === 0) {
-        showAlert("No history data to download", "warning");
-        return;
-    }
-
-    let csvRows = [];
-    
-    // Headers with Excel-friendly names
-    const headers = [
-        "Date", "Time", "Mood", "Productivity Score (/10)", 
-        "Total Hours", "Number of Blocks", "All Tasks", 
-        "Block Details with Ratings", "Distractions", "Comments"
-    ];
-    csvRows.push(headers.join(','));
-    
-    // Process each entry
-    historyToDownload.forEach(entry => {
-        // Format mood
-        let moodText = entry.mood;
-        if (moodText === "🔥") moodText = "Focused";
-        else if (moodText === "😊") moodText = "Happy";
-        else if (moodText === "😴") moodText = "Tired";
-        
-        // Format block details
-        let blockDetailsText = "";
-        if (entry.blockMultiTasks) {
-            const blockList = [];
-            for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
-                const tasks = entry.blockMultiTasks[i];
-                if (tasks && tasks.length > 0) {
-                    const taskDetails = tasks.map(t => {
-                        const taskName = t.taskName;
-                        const rating = t.rating ? `${t.rating}/10` : 'Not rated';
-                        return `${taskName} [${rating}]`;
-                    }).join(', ');
-                    blockList.push(`Block ${i+1}: ${taskDetails}`);
-                }
-            }
-            blockDetailsText = blockList.join('; ');
-        }
-        
-        // Format distractions (clean emojis for Excel)
-        let distractionText = "None";
-        if (entry.distractions && Object.keys(entry.distractions).length > 0) {
-            let allDist = [];
-            for (let blockIdx in entry.distractions) {
-                const distList = entry.distractions[blockIdx];
-                distList.forEach(d => {
-                    let cleanDist = d.distractionType || d.customText || "Other";
-                    cleanDist = cleanDist.replace(/[📱📧📞💬🔊💭🍽️📺🎮😴✨]/g, '').trim();
-                    allDist.push(cleanDist);
-                });
-            }
-            distractionText = allDist.join(' | ');
-        }
-        
-        // Build row
-        const row = [
-            `"${entry.date}"`,
-            `"${new Date(entry.timestamp).toLocaleTimeString()}"`,
-            `"${moodText}"`,
-            entry.productivity,
-            entry.totalHours,
-            entry.blocks,
-            `"${entry.tasks.replace(/"/g, '""')}"`,
-            `"${blockDetailsText.replace(/"/g, '""')}"`,
-            `"${distractionText.replace(/"/g, '""')}"`,
-            `"${(entry.comments || "").replace(/"/g, '""')}"`
-        ];
-        csvRows.push(row.join(','));
-    });
-    
-    // Add BOM for Excel UTF-8 support
-    const csvContent = "\uFEFF" + csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Chimla_Tabdew_Export_${currentUser ? currentUser.username : 'User'}_${timestamp}.csv`);
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    showAlert(`✅ Exported ${historyToDownload.length} entries to Excel!`, 'success');
-}
-
-// Export with date range filter
-function showExportOptions() {
-    const modalHtml = `
-        <div id="export-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10006;">
-            <div style="background:var(--card-bg);padding:24px;border-radius:20px;max-width:400px;width:90%;">
-                <h3 style="margin-bottom:15px;">📊 Export Data to Excel</h3>
-                
-                <div class="form-group">
-                    <label class="form-label">Date Range</label>
-                    <select id="export-range" class="form-input" style="margin-bottom:10px;">
-                        <option value="all">All Time</option>
-                        <option value="last7">Last 7 Days</option>
-                        <option value="last30">Last 30 Days</option>
-                        <option value="last90">Last 90 Days</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
-                </div>
-                
-                <div id="custom-date-range" style="display:none;">
-                    <div class="form-group">
-                        <label class="form-label">From Date</label>
-                        <input type="date" id="start-date" class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">To Date</label>
-                        <input type="date" id="end-date" class="form-input">
-                    </div>
-                </div>
-                
-                <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button onclick="exportWithOptions()" class="btn btn-primary" style="flex:1;">📥 Export Excel</button>
-                    <button onclick="closeExportModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Date range toggle
-    document.getElementById('export-range').addEventListener('change', function() {
-        const customDiv = document.getElementById('custom-date-range');
-        customDiv.style.display = this.value === 'custom' ? 'block' : 'none';
-    });
-}
-
-function closeExportModal() {
-    document.getElementById('export-modal')?.remove();
-}
-
-function exportWithOptions() {
-    const range = document.getElementById('export-range').value;
-    let history = getHistory();
-    
-    const now = new Date();
-    let filteredHistory = [...history];
-    
-    switch(range) {
-        case 'last7':
-            const last7 = new Date();
-            last7.setDate(last7.getDate() - 7);
-            filteredHistory = history.filter(entry => new Date(entry.date) >= last7);
-            break;
-        case 'last30':
-            const last30 = new Date();
-            last30.setDate(last30.getDate() - 30);
-            filteredHistory = history.filter(entry => new Date(entry.date) >= last30);
-            break;
-        case 'last90':
-            const last90 = new Date();
-            last90.setDate(last90.getDate() - 90);
-            filteredHistory = history.filter(entry => new Date(entry.date) >= last90);
-            break;
-        case 'custom':
-            const startDate = new Date(document.getElementById('start-date').value);
-            const endDate = new Date(document.getElementById('end-date').value);
-            if (startDate && endDate) {
-                filteredHistory = history.filter(entry => {
-                    const entryDate = new Date(entry.date);
-                    return entryDate >= startDate && entryDate <= endDate;
-                });
-            }
-            break;
-    }
-    
-    if (filteredHistory.length === 0) {
-        showAlert('No data in selected date range', 'warning');
-        closeExportModal();
-        return;
-    }
-    
-    // Export the filtered data
-    exportFilteredHistoryToExcel(filteredHistory);
-    closeExportModal();
-}
-
-function exportFilteredHistoryToExcel(history) {
-    let csvRows = [];
-    
-    const headers = [
-        "Date", "Time", "Mood", "Productivity Score (/10)", 
-        "Total Hours", "Number of Blocks", "All Tasks", 
-        "Block Details with Ratings", "Distractions", "Comments"
-    ];
-    csvRows.push(headers.join(','));
-    
-    history.forEach(entry => {
-        let moodText = entry.mood;
-        if (moodText === "🔥") moodText = "Focused";
-        else if (moodText === "😊") moodText = "Happy";
-        else if (moodText === "😴") moodText = "Tired";
-        
-        let blockDetailsText = "";
-        if (entry.blockMultiTasks) {
-            const blockList = [];
-            for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
-                const tasks = entry.blockMultiTasks[i];
-                if (tasks && tasks.length > 0) {
-                    const taskDetails = tasks.map(t => {
-                        const taskName = t.taskName;
-                        const rating = t.rating ? `${t.rating}/10` : 'Not rated';
-                        return `${taskName} [${rating}]`;
-                    }).join(', ');
-                    blockList.push(`Block ${i+1}: ${taskDetails}`);
-                }
-            }
-            blockDetailsText = blockList.join('; ');
-        }
-        
-        let distractionText = "None";
-        if (entry.distractions && Object.keys(entry.distractions).length > 0) {
-            let allDist = [];
-            for (let blockIdx in entry.distractions) {
-                const distList = entry.distractions[blockIdx];
-                distList.forEach(d => {
-                    let cleanDist = d.distractionType || d.customText || "Other";
-                    cleanDist = cleanDist.replace(/[📱📧📞💬🔊💭🍽️📺🎮😴✨]/g, '').trim();
-                    allDist.push(cleanDist);
-                });
-            }
-            distractionText = allDist.join(' | ');
-        }
-        
-        const row = [
-            `"${entry.date}"`,
-            `"${new Date(entry.timestamp).toLocaleTimeString()}"`,
-            `"${moodText}"`,
-            entry.productivity,
-            entry.totalHours,
-            entry.blocks,
-            `"${entry.tasks.replace(/"/g, '""')}"`,
-            `"${blockDetailsText.replace(/"/g, '""')}"`,
-            `"${distractionText.replace(/"/g, '""')}"`,
-            `"${(entry.comments || "").replace(/"/g, '""')}"`
-        ];
-        csvRows.push(row.join(','));
-    });
-    
-    const csvContent = "\uFEFF" + csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Chimla_Tabdew_Export_${currentUser ? currentUser.username : 'User'}_${timestamp}.csv`);
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    showAlert(`✅ Exported ${history.length} entries to Excel!`, 'success');
-}
-
-function updateExportButton() {
-    const historyBtn = document.querySelector('.header-buttons .btn-primary');
-    if (historyBtn && historyBtn.innerHTML.includes('📥 Download CSV')) {
-        historyBtn.innerHTML = '📊 Export to Excel';
-        historyBtn.onclick = showExportOptions;
     }
 }
 
@@ -1733,27 +1660,10 @@ function loadProductivityTrendChart() {
     if (productivityChart) productivityChart.destroy();
     productivityChart = new Chart(ctx, { 
         type: 'line', 
-        data: { 
-            labels, 
-            datasets: [{ 
-                label: 'Productivity Rating', 
-                data, 
-                borderColor: '#1B4D3E', 
-                backgroundColor: 'rgba(27, 77, 62, 0.1)', 
-                tension: 0.4, 
-                pointRadius: 6, 
-                pointBackgroundColor: '#1B4D3E', 
-                pointBorderColor: '#fff', 
-                pointBorderWidth: 2 
-            }] 
-        }, 
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: true, 
-            scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } } 
-        } 
+        data: { labels, datasets: [{ label: 'Productivity Rating', data, borderColor: '#1B4D3E', backgroundColor: 'rgba(27, 77, 62, 0.1)', tension: 0.4, pointRadius: 6, pointBackgroundColor: '#1B4D3E', pointBorderColor: '#fff', pointBorderWidth: 2 }] }, 
+        options: { responsive: true, maintainAspectRatio: true, scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } } } 
     });
-    document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>. ${avgProductivity >= 8 ? 'Excellent consistency! 🎉' : avgProductivity >= 6 ? 'Good progress, keep it up!' : 'Room for improvement.'}`;
+    document.getElementById('trend-insight').innerHTML = `📈 <strong>Your Trend:</strong> Average productivity is <strong>${avgProductivity}/10</strong>.`;
 }
 
 function loadMoodDistributionChart() {
@@ -1767,18 +1677,7 @@ function loadMoodDistributionChart() {
     const moodCounts = {};
     history.forEach(h => moodCounts[h.mood] = (moodCounts[h.mood] || 0) + 1);
     if (moodChart) moodChart.destroy();
-    moodChart = new Chart(ctx, { 
-        type: 'doughnut', 
-        data: { 
-            labels: Object.keys(moodCounts), 
-            datasets: [{ 
-                data: Object.values(moodCounts), 
-                backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], 
-                borderRadius: 8 
-            }] 
-        }, 
-        options: { responsive: true } 
-    });
+    moodChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(moodCounts), datasets: [{ data: Object.values(moodCounts), backgroundColor: ['#1B4D3E', '#2A7F6F', '#D4A574'], borderRadius: 8 }] }, options: { responsive: true } });
     document.getElementById('mood-insight').innerHTML = `😊 <strong>Mood Insight:</strong> Your dominant mood is <strong>${getMostFrequent(history.map(h => h.mood))}</strong>.`;
 }
 
@@ -1792,10 +1691,7 @@ function loadHeatmapChart() {
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     const entryMap = {};
-    history.forEach(entry => { 
-        const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB'); 
-        entryMap[date] = parseInt(entry.productivity); 
-    });
+    history.forEach(entry => { const date = new Date(entry.date + ' 00:00:00').toLocaleDateString('en-GB'); entryMap[date] = parseInt(entry.productivity); });
     let html = '<div class="heatmap-calendar">';
     let currentDate = new Date(thirtyDaysAgo);
     while (currentDate <= today) {
@@ -1817,95 +1713,42 @@ function loadCorrelationChart() {
         if (correlationChart) correlationChart.destroy(); 
         return; 
     }
-    const scatterData = history.map(entry => ({ 
-        x: parseFloat(entry.totalHours), 
-        y: parseInt(entry.productivity), 
-        mood: entry.mood 
-    }));
+    const scatterData = history.map(entry => ({ x: parseFloat(entry.totalHours), y: parseInt(entry.productivity) }));
     if (correlationChart) correlationChart.destroy();
-    correlationChart = new Chart(ctx, { 
-        type: 'scatter', 
-        data: { 
-            datasets: [{ 
-                label: 'Entries', 
-                data: scatterData, 
-                backgroundColor: '#1B4D3E', 
-                pointRadius: 8 
-            }] 
-        }, 
-        options: { 
-            responsive: true, 
-            scales: { 
-                x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12 }, 
-                y: { title: { display: true, text: 'Productivity (/10)' }, min: 0, max: 10 } 
-            } 
-        } 
-    });
-    document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> Track your hours vs productivity to find your optimal work duration.`;
+    correlationChart = new Chart(ctx, { type: 'scatter', data: { datasets: [{ label: 'Entries', data: scatterData, backgroundColor: '#1B4D3E', pointRadius: 8 }] }, options: { responsive: true, scales: { x: { title: { display: true, text: 'Hours Worked' }, min: 0, max: 12 }, y: { title: { display: true, text: 'Productivity (/10)' }, min: 0, max: 10 } } } });
+    document.getElementById('correlation-insight').innerHTML = `📈 <strong>Correlation Analysis:</strong> Track hours vs productivity.`;
 }
 
 function loadBlockRatingsChart() {
     const history = getHistory();
     const ctx = document.getElementById('blockRatingsChart').getContext('2d');
     if (history.length === 0 || !history.some(h => h.blockRatingMap && Object.keys(h.blockRatingMap).length > 0)) { 
-        document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data available.'; 
+        document.getElementById('blockratings-insight').innerHTML = '📭 No block rating data.'; 
         if (blockRatingsChart) blockRatingsChart.destroy(); 
         return; 
     }
     const blockRatingsAggregate = {};
-    history.forEach(entry => { 
-        if (entry.blockRatingMap) {
-            Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => { 
-                if (!blockRatingsAggregate[blockIdx]) blockRatingsAggregate[blockIdx] = { sum: 0, count: 0 }; 
-                blockRatingsAggregate[blockIdx].sum += rating; 
-                blockRatingsAggregate[blockIdx].count++; 
-            }); 
-        }
-    });
+    history.forEach(entry => { if (entry.blockRatingMap) { Object.entries(entry.blockRatingMap).forEach(([blockIdx, rating]) => { if (!blockRatingsAggregate[blockIdx]) blockRatingsAggregate[blockIdx] = { sum: 0, count: 0 }; blockRatingsAggregate[blockIdx].sum += rating; blockRatingsAggregate[blockIdx].count++; }); } });
     const blockLabels = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => `Block ${parseInt(idx) + 1}`);
     const avgRatings = Object.keys(blockRatingsAggregate).sort((a, b) => a - b).map(idx => (blockRatingsAggregate[idx].sum / blockRatingsAggregate[idx].count).toFixed(1));
     if (blockRatingsChart) blockRatingsChart.destroy();
-    blockRatingsChart = new Chart(ctx, { 
-        type: 'bar', 
-        data: { 
-            labels: blockLabels, 
-            datasets: [{ 
-                label: 'Average Rating', 
-                data: avgRatings, 
-                backgroundColor: '#1B4D3E', 
-                borderRadius: 8 
-            }] 
-        }, 
-        options: { 
-            responsive: true, 
-            scales: { y: { min: 0, max: 10 } } 
-        } 
-    });
-    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Productivity Analysis:</strong> See which blocks are your most and least productive.`;
+    blockRatingsChart = new Chart(ctx, { type: 'bar', data: { labels: blockLabels, datasets: [{ label: 'Average Rating', data: avgRatings, backgroundColor: '#1B4D3E', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { min: 0, max: 10 } } } });
+    document.getElementById('blockratings-insight').innerHTML = `⭐ <strong>Block Analysis:</strong> See which blocks are most productive.`;
 }
 
 function loadDistractionChart() {
     const history = getHistory();
     const ctx = document.getElementById('distractionChart').getContext('2d');
     if (history.length === 0) { 
-        document.getElementById('distraction-insight').innerHTML = '📭 No distraction data available.'; 
+        document.getElementById('distraction-insight').innerHTML = '📭 No distraction data.'; 
         if (distractionChart) distractionChart.destroy(); 
         return; 
     }
     const distractionFreq = {};
     let totalDistractions = 0;
-    history.forEach(entry => { 
-        if (entry.distractions) {
-            Object.values(entry.distractions).forEach(distList => { 
-                distList.forEach(d => { 
-                    distractionFreq[d.distractionType] = (distractionFreq[d.distractionType] || 0) + 1; 
-                    totalDistractions++; 
-                }); 
-            }); 
-        }
-    });
+    history.forEach(entry => { if (entry.distractions) { Object.values(entry.distractions).forEach(distList => { distList.forEach(d => { distractionFreq[d.distractionType] = (distractionFreq[d.distractionType] || 0) + 1; totalDistractions++; }); }); } });
     if (totalDistractions === 0) { 
-        document.getElementById('distraction-insight').innerHTML = '📭 No distractions logged yet.'; 
+        document.getElementById('distraction-insight').innerHTML = '📭 No distractions logged.'; 
         if (distractionChart) distractionChart.destroy(); 
         return; 
     }
@@ -1913,156 +1756,56 @@ function loadDistractionChart() {
     const labels = sorted.map(([type]) => type.length > 20 ? type.substring(0, 18) + '...' : type);
     const data = sorted.map(([, count]) => count);
     if (distractionChart) distractionChart.destroy();
-    distractionChart = new Chart(ctx, { 
-        type: 'bar', 
-        data: { 
-            labels, 
-            datasets: [{ 
-                label: 'Frequency', 
-                data, 
-                backgroundColor: '#F59E0B', 
-                borderRadius: 8 
-            }] 
-        }, 
-        options: { 
-            responsive: true, 
-            scales: { y: { ticks: { stepSize: 1 } } } 
-        } 
-    });
-    const topDistraction = sorted[0];
-    document.getElementById('distraction-insight').innerHTML = `🚫 <strong>Distraction Analysis:</strong> Most common: ${topDistraction[0]} (${topDistraction[1]} times). Total: ${totalDistractions} distractions.`;
+    distractionChart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Frequency', data, backgroundColor: '#F59E0B', borderRadius: 8 }] }, options: { responsive: true, scales: { y: { ticks: { stepSize: 1 } } } } });
+    document.getElementById('distraction-insight').innerHTML = `🚫 <strong>Top Distraction:</strong> ${sorted[0][0]} (${sorted[0][1]} times). Total: ${totalDistractions}.`;
 }
 
 // ============================================
-// NOTIFICATIONS & REMINDERS (FIXED FOR MOBILE)
+// NOTIFICATIONS, BACKUP, PWA
 // ============================================
 
 async function requestNotificationPermission() {
-    if (!("Notification" in window)) { 
-        showAlert("❌ Your browser doesn't support notifications", "error"); 
-        return; 
-    }
-    
-    if (Notification.permission === "granted") { 
-        notificationPermissionGranted = true; 
-        showAlert("✅ Notifications already enabled!", "success"); 
-        showReminderSettings();
-        
-        setTimeout(() => {
-            if (Notification.permission === "granted") {
-                new Notification("Chimla Tabdew", {
-                    body: "Notifications working! You'll receive daily reminders.",
-                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E",
-                    vibrate: [200, 100, 200]
-                });
-            }
-        }, 1000);
-        return; 
-    }
-    
+    if (!("Notification" in window)) { showAlert("Notifications not supported", "error"); return; }
+    if (Notification.permission === "granted") { notificationPermissionGranted = true; showAlert("Notifications enabled!", "success"); showReminderSettings(); return; }
     if (Notification.permission !== "denied") {
         const permission = await Notification.requestPermission();
-        if (permission === "granted") { 
-            notificationPermissionGranted = true; 
-            showAlert("✅ Notifications enabled! You'll get daily reminders.", "success"); 
-            showReminderSettings();
-            setupLocalNotifications();
-            
-            setTimeout(() => {
-                new Notification("Chimla Tabdew", {
-                    body: "Reminders are now active! 🎉",
-                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E"
-                });
-            }, 500);
-        } else {
-            showAlert("⚠️ Please allow notifications for reminders.", "error");
-        }
-    } else {
-        showAlert("🔕 Notifications are blocked. Please enable in browser settings.", "error");
-    }
+        if (permission === "granted") { notificationPermissionGranted = true; showAlert("Notifications enabled!", "success"); showReminderSettings(); setupLocalNotifications(); }
+        else showAlert("Please allow notifications", "error");
+    } else showAlert("Notifications blocked", "error");
 }
 
 function setupLocalNotifications() {
     if (window.notificationInterval) clearInterval(window.notificationInterval);
-    
     window.notificationInterval = setInterval(() => {
         const now = new Date();
         const reminderTime = localStorage.getItem('reminderTime') || '20:00';
         const [hours, minutes] = reminderTime.split(':');
-        
         if (now.getHours() === parseInt(hours) && now.getMinutes() === parseInt(minutes)) {
             const history = getHistory();
             const today = new Date().toLocaleDateString('en-GB');
             const loggedToday = history.some(entry => entry.date === today);
-            const lastNotificationDate = localStorage.getItem('lastNotificationDate');
-            
-            if (!loggedToday && lastNotificationDate !== today && Notification.permission === 'granted') {
-                const notification = new Notification("⏰ Chimla Tabdew Reminder", {
-                    body: "Don't forget to log your productivity today!",
-                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E",
-                    vibrate: [200, 100, 200],
-                    requireInteraction: true
-                });
-                
-                notification.onclick = function() {
-                    window.focus();
-                    document.getElementById('main-screen')?.classList.remove('hidden');
-                    document.getElementById('login-screen')?.classList.add('hidden');
-                    notification.close();
-                };
-                
-                localStorage.setItem('lastNotificationDate', today);
+            if (!loggedToday && Notification.permission === 'granted') {
+                new Notification("⏰ Chimla Tabdew Reminder", { body: "Don't forget to log your productivity today!", icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E", vibrate: [200, 100, 200] });
             }
         }
     }, 60000);
 }
 
-function showReminderSettings() { 
-    const card = document.getElementById("reminder-settings"); 
-    if(card) card.style.display = "block"; 
-    loadReminderSettings(); 
-}
-function toggleReminderSettings() { 
-    const ctrl = document.querySelector('.reminder-controls'); 
-    if(ctrl) ctrl.style.display = ctrl.style.display === 'none' ? 'flex' : 'none'; 
-}
+function showReminderSettings() { const card = document.getElementById("reminder-settings"); if(card) card.style.display = "block"; loadReminderSettings(); }
+function toggleReminderSettings() { const ctrl = document.querySelector('.reminder-controls'); if(ctrl) ctrl.style.display = ctrl.style.display === 'none' ? 'flex' : 'none'; }
 function loadReminderSettings() {
-    const daily = localStorage.getItem("dailyReminderEnabled") === "true";
-    document.getElementById("daily-reminder-toggle").checked = daily;
+    document.getElementById("daily-reminder-toggle").checked = localStorage.getItem("dailyReminderEnabled") === "true";
     document.getElementById("weekly-report-toggle").checked = localStorage.getItem("weeklyReportEnabled") === "true";
     document.getElementById("nudge-toggle").checked = localStorage.getItem("nudgeEnabled") === "true";
     document.getElementById("reminder-time").value = localStorage.getItem("reminderTime") || "20:00";
 }
-function toggleDailyReminder() { 
-    localStorage.setItem("dailyReminderEnabled", document.getElementById("daily-reminder-toggle").checked);
-    if (document.getElementById("daily-reminder-toggle").checked) {
-        setupLocalNotifications();
-    }
-}
-function saveReminderTime() { 
-    localStorage.setItem("reminderTime", document.getElementById("reminder-time").value);
-    showAlert(`Reminder time set to ${document.getElementById("reminder-time").value}`, 'success');
-}
+function toggleDailyReminder() { localStorage.setItem("dailyReminderEnabled", document.getElementById("daily-reminder-toggle").checked); if (document.getElementById("daily-reminder-toggle").checked) setupLocalNotifications(); }
+function saveReminderTime() { localStorage.setItem("reminderTime", document.getElementById("reminder-time").value); showAlert(`Reminder time set`, 'success'); }
 function toggleWeeklyReport() { localStorage.setItem("weeklyReportEnabled", document.getElementById("weekly-report-toggle").checked); }
 function toggleNudge() { localStorage.setItem("nudgeEnabled", document.getElementById("nudge-toggle").checked); }
-function setupReminderSystem() { setupLocalNotifications(); }
-function getBestWorkTimeSuggestions() { 
-    const history = getHistory(); 
-    if (history.length < 5) return "Log at least 5 entries to get suggestions!"; 
-    return "Based on your data, optimal work hours vary. Keep tracking!"; 
-}
-function displayWorkTimeSuggestion() { 
-    const container = document.getElementById("work-time-suggestion"); 
-    if (container) { 
-        container.innerHTML = `<h4>⏰ Personalized Work Suggestion</h4><p>${getBestWorkTimeSuggestions()}</p>`; 
-        container.style.display = "block"; 
-    } 
-}
+function getBestWorkTimeSuggestions() { const history = getHistory(); if (history.length < 5) return "Log at least 5 entries to get suggestions!"; return "Based on your data, optimal work hours vary. Keep tracking!"; }
+function displayWorkTimeSuggestion() { const container = document.getElementById("work-time-suggestion"); if (container) { container.innerHTML = `<h4>⏰ Personalized Work Suggestion</h4><p>${getBestWorkTimeSuggestions()}</p>`; container.style.display = "block"; } }
 function addWorkTimeSuggestionCard() { displayWorkTimeSuggestion(); }
-
-// ============================================
-// BACKUP & RESTORE (Cross-Device Sync)
-// ============================================
 
 function addBackupButton() {
     const headerButtons = document.querySelector('.header-buttons');
@@ -2077,45 +1820,15 @@ function addBackupButton() {
 }
 
 function showBackupModal() {
-    const modalHtml = `
-        <div id="backup-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10005;">
-            <div style="background:var(--card-bg);padding:24px;border-radius:20px;max-width:400px;width:90%;">
-                <h3 style="margin-bottom:15px;">💾 Backup & Restore</h3>
-                <p style="margin-bottom:15px;font-size:0.85rem;">Move your data between devices</p>
-                <button onclick="exportUserData()" class="btn btn-primary" style="width:100%;margin-bottom:10px;">📤 Export Data</button>
-                <label class="btn btn-secondary" style="width:100%;text-align:center;cursor:pointer;display:block;">
-                    📥 Import Data
-                    <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importUserData(this.files[0])">
-                </label>
-                <button onclick="closeBackupModal()" class="btn btn-secondary" style="width:100%;margin-top:10px;">Cancel</button>
-            </div>
-        </div>
-    `;
+    const modalHtml = `<div id="backup-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10005;"><div style="background:var(--card-bg);padding:24px;border-radius:20px;max-width:400px;width:90%;"><h3>💾 Backup & Restore</h3><p style="margin-bottom:15px;">Move your data between devices</p><button onclick="exportUserData()" class="btn btn-primary" style="width:100%;margin-bottom:10px;">📤 Export Data</button><label class="btn btn-secondary" style="width:100%;text-align:center;cursor:pointer;display:block;">📥 Import Data<input type="file" id="import-file" accept=".json" style="display:none;" onchange="importUserData(this.files[0])"></label><button onclick="closeBackupModal()" class="btn btn-secondary" style="width:100%;margin-top:10px;">Cancel</button></div></div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-function closeBackupModal() {
-    document.getElementById('backup-modal')?.remove();
-}
+function closeBackupModal() { document.getElementById('backup-modal')?.remove(); }
 
 function exportUserData() {
-    if (!currentUser) {
-        showAlert('Please login first', 'error');
-        return;
-    }
-    
-    const userData = {
-        username: currentUser.username,
-        fullname: currentUser.fullname,
-        history: getHistory(),
-        settings: {
-            theme: localStorage.getItem('theme'),
-            dailyReminder: localStorage.getItem('dailyReminderEnabled'),
-            reminderTime: localStorage.getItem('reminderTime')
-        },
-        exportDate: new Date().toISOString()
-    };
-    
+    if (!currentUser) { showAlert('Please login first', 'error'); return; }
+    const userData = { username: currentUser.username, fullname: currentUser.fullname, history: getHistory(), settings: { theme: localStorage.getItem('theme'), dailyReminder: localStorage.getItem('dailyReminderEnabled'), reminderTime: localStorage.getItem('reminderTime') }, exportDate: new Date().toISOString() };
     const dataStr = JSON.stringify(userData, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2124,129 +1837,128 @@ function exportUserData() {
     link.download = `chimla_backup_${currentUser.username}_${new Date().toISOString().slice(0,10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    
-    showAlert('📦 Data exported! Save this file safely.', 'success');
+    showAlert('📦 Data exported!', 'success');
     closeBackupModal();
 }
 
 function importUserData(file) {
-    if (!currentUser) {
-        showAlert('Please login first', 'error');
-        return;
-    }
-    
+    if (!currentUser) { showAlert('Please login first', 'error'); return; }
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
             const importedData = JSON.parse(e.target.result);
-            
             if (importedData.history && Array.isArray(importedData.history)) {
                 const existingHistory = getHistory();
                 const mergedHistory = [...existingHistory, ...importedData.history];
-                const uniqueHistory = mergedHistory.filter((entry, index, self) => 
-                    index === self.findIndex(e => e.timestamp === entry.timestamp)
-                );
-                
+                const uniqueHistory = mergedHistory.filter((entry, index, self) => index === self.findIndex(e => e.timestamp === entry.timestamp));
                 localStorage.setItem(`chimla_history_${currentUser.username}`, JSON.stringify(uniqueHistory));
                 permanentHistoryBackup = [...uniqueHistory];
-                
-                if (importedData.settings) {
-                    if (importedData.settings.theme) applyTheme(importedData.settings.theme);
-                    if (importedData.settings.dailyReminder === 'true') {
-                        document.getElementById('daily-reminder-toggle').checked = true;
-                        setupLocalNotifications();
-                    }
-                    if (importedData.settings.reminderTime) {
-                        document.getElementById('reminder-time').value = importedData.settings.reminderTime;
-                    }
-                }
-                
                 showAlert(`✅ Imported ${importedData.history.length} entries!`, 'success');
                 loadHistoryData();
-            } else {
-                showAlert('Invalid backup file', 'error');
-            }
-        } catch(err) {
-            showAlert('Error reading backup file', 'error');
-        }
+            } else showAlert('Invalid backup file', 'error');
+        } catch(err) { showAlert('Error reading backup file', 'error'); }
     };
     reader.readAsText(file);
     closeBackupModal();
 }
 
-// ============================================
-// MOBILE COMPATIBILITY CHECK
-// ============================================
+function downloadHistoryCSV() {
+    const historyToDownload = permanentHistoryBackup.length > 0 ? permanentHistoryBackup : getHistory();
+    if (historyToDownload.length === 0) { showAlert("No history data", "warning"); return; }
+    let csvRows = [["Date", "Time", "Mood", "Productivity", "Total Hours", "Blocks", "Tasks", "Block Details", "Distractions", "Comments"]];
+    historyToDownload.forEach(entry => {
+        let moodText = entry.mood === "🔥" ? "Focused" : entry.mood === "😊" ? "Happy" : "Tired";
+        let blockDetailsText = "";
+        if (entry.blockMultiTasks) {
+            const blockList = [];
+            for (let i = 0; i < Object.keys(entry.blockMultiTasks).length; i++) {
+                const tasks = entry.blockMultiTasks[i];
+                if (tasks && tasks.length > 0) blockList.push(`Block ${i+1}: ${tasks.map(t => `${t.taskName}[${t.rating || 'NR'}/10]`).join(', ')}`);
+            }
+            blockDetailsText = blockList.join('; ');
+        }
+        let distractionText = "None";
+        if (entry.distractions && Object.keys(entry.distractions).length > 0) {
+            let allDist = [];
+            for (let blockIdx in entry.distractions) entry.distractions[blockIdx].forEach(d => allDist.push(d.distractionType));
+            distractionText = allDist.join(' | ');
+        }
+        csvRows.push([`"${entry.date}"`, `"${new Date(entry.timestamp).toLocaleTimeString()}"`, `"${moodText}"`, entry.productivity, entry.totalHours, entry.blocks, `"${entry.tasks.replace(/"/g, '""')}"`, `"${blockDetailsText.replace(/"/g, '""')}"`, `"${distractionText.replace(/"/g, '""')}"`, `"${(entry.comments || "").replace(/"/g, '""')}"`]);
+    });
+    const csvContent = "\uFEFF" + csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Chimla_Tabdew_Export_${currentUser ? currentUser.username : 'User'}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`);
+    link.click();
+    URL.revokeObjectURL(url);
+    showAlert(`✅ Exported ${historyToDownload.length} entries!`, 'success');
+}
 
-function checkMobileCompatibility() {
-    const issues = [];
-    
-    try {
-        localStorage.setItem('test', 'test');
-        localStorage.removeItem('test');
-    } catch(e) {
-        issues.push('❌ localStorage not available (private browsing mode)');
-        showAlert('⚠️ Private browsing mode detected. Some features may not work properly.', 'warning');
+function updateExportButton() {
+    const historyBtn = document.querySelector('.header-buttons .btn-primary');
+    if (historyBtn && historyBtn.innerHTML.includes('📥 Download CSV')) {
+        historyBtn.innerHTML = '📊 Export to Excel';
+        historyBtn.onclick = downloadHistoryCSV;
     }
-    
-    if (!('serviceWorker' in navigator)) {
-        issues.push('❌ Service Workers not supported');
-    }
-    
-    if (!('Notification' in window)) {
-        issues.push('❌ Notifications not supported');
-    }
-    
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-        console.log('🎉 Chimla Tabdew is running as installed PWA');
-    }
-    
-    return issues;
 }
 
 // ============================================
-// PWA INSTALL PROMPT
+// MOBILE & PWA INIT
 // ============================================
 
-let deferredPrompt;
+function initTouchGestures() {
+    const container = document.querySelector('.container');
+    if (!container) return;
+    let touchStartX = 0, touchEndX = 0;
+    container.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+    container.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        const deltaX = touchEndX - touchStartX;
+        if (Math.abs(deltaX) > 50) {
+            if (deltaX > 0 && document.getElementById('history-screen') && !document.getElementById('history-screen').classList.contains('hidden')) backToDashboard();
+            else if (deltaX < 0 && document.getElementById('main-screen') && !document.getElementById('main-screen').classList.contains('hidden')) showHistoryScreen();
+        }
+    });
+}
 
+function initOfflineIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'offline-indicator';
+    indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#F59E0B;color:white;text-align:center;padding:10px;font-size:0.8rem;z-index:10002;';
+    indicator.innerHTML = '📡 Offline. Changes save locally.';
+    indicator.classList.add('hidden');
+    document.body.appendChild(indicator);
+    window.addEventListener('online', () => { indicator.classList.add('hidden'); showAlert('🟢 Back online!', 'success'); });
+    window.addEventListener('offline', () => { indicator.classList.remove('hidden'); showAlert('🔴 Offline mode', 'warning'); });
+}
+
+function checkMobileCompatibility() {
+    try { localStorage.setItem('test', 'test'); localStorage.removeItem('test'); } catch(e) { showAlert('⚠️ Private browsing mode detected', 'warning'); }
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) console.log('🎉 Running as PWA');
+}
+
+let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
     setTimeout(() => {
-        if (deferredPrompt && !localStorage.getItem('installDismissed') && 
-            !window.matchMedia('(display-mode: standalone)').matches) {
-            showInstallBanner();
+        if (deferredPrompt && !localStorage.getItem('installDismissed') && !window.matchMedia('(display-mode: standalone)').matches) {
+            const banner = document.createElement('div');
+            banner.id = 'pwa-install-banner';
+            banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:2px solid var(--primary);animation:slideInUp 0.3s ease-out;';
+            banner.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;"><div style="font-size:2rem;">📱</div><div style="flex:1;"><strong>Install Chimla Tabdew</strong><small style="font-size:0.7rem;display:block;">Get app-like experience</small></div><button onclick="installPWA()" class="btn btn-primary btn-sm">Install</button><button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button></div>`;
+            document.body.appendChild(banner);
         }
     }, 3000);
 });
-
-function showInstallBanner() {
-    const banner = document.createElement('div');
-    banner.id = 'pwa-install-banner';
-    banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:2px solid var(--primary);animation:slideInUp 0.3s ease-out;';
-    banner.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
-            <div style="font-size:2rem;">📱</div>
-            <div style="flex:1;">
-                <strong style="font-size:0.9rem;">Install Chimla Tabdew</strong>
-                <small style="font-size:0.7rem;display:block;">Get app-like experience with offline support</small>
-            </div>
-            <button onclick="installPWA()" class="btn btn-primary btn-sm" style="padding:8px 16px;">Install</button>
-            <button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
-        </div>
-    `;
-    document.body.appendChild(banner);
-}
 
 function installPWA() {
     if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                showAlert('🎉 Thanks for installing Chimla Tabdew!', 'success');
-            }
+            if (choiceResult.outcome === 'accepted') showAlert('🎉 Thanks for installing!', 'success');
             deferredPrompt = null;
             document.getElementById('pwa-install-banner')?.remove();
         });
@@ -2259,75 +1971,26 @@ function dismissInstallBanner() {
 }
 
 // ============================================
-// TOUCH GESTURES FOR MOBILE
+// INITIALIZATION
 // ============================================
 
-let touchStartX = 0;
-let touchEndX = 0;
-
-function initTouchGestures() {
-    const container = document.querySelector('.container');
-    if (!container) return;
-    
-    container.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    
-    container.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    });
-    
-    const buttons = document.querySelectorAll('.btn, .mood-btn, .task-tag-remove, .distraction-tag-remove');
-    buttons.forEach(btn => {
-        btn.addEventListener('touchstart', () => {
-            if (navigator.vibrate) navigator.vibrate(10);
-        });
-    });
-}
-
-function handleSwipe() {
-    const deltaX = touchEndX - touchStartX;
-    
-    if (Math.abs(deltaX) > 50) {
-        if (deltaX > 0) {
-            if (document.getElementById('history-screen') && 
-                !document.getElementById('history-screen').classList.contains('hidden')) {
-                backToDashboard();
-                if (navigator.vibrate) navigator.vibrate(50);
-            }
-        } else {
-            if (document.getElementById('main-screen') && 
-                !document.getElementById('main-screen').classList.contains('hidden')) {
-                showHistoryScreen();
-                if (navigator.vibrate) navigator.vibrate(50);
-            }
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    initTheme();
+    checkMobileCompatibility();
+    initOfflineIndicator();
+    initTouchGestures();
+    checkRememberedUser();
+    const hasSession = checkExistingSession();
+    if (!hasSession) {
+        document.getElementById("login-screen").classList.remove("hidden");
+        document.getElementById("main-screen").classList.add("hidden");
+        document.getElementById("history-screen").classList.add("hidden");
     }
-}
-
-// ============================================
-// OFFLINE MODE INDICATOR
-// ============================================
-
-function initOfflineIndicator() {
-    const indicator = document.createElement('div');
-    indicator.id = 'offline-indicator';
-    indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#F59E0B;color:white;text-align:center;padding:10px;font-size:0.8rem;font-weight:600;z-index:10002;animation:slideInDown 0.3s ease-out;';
-    indicator.innerHTML = '📡 You are offline. Changes will save locally.';
-    indicator.classList.add('hidden');
-    document.body.appendChild(indicator);
-    
-    window.addEventListener('online', () => {
-        indicator.classList.add('hidden');
-        showAlert('🟢 Back online!', 'success');
-    });
-    
-    window.addEventListener('offline', () => {
-        indicator.classList.remove('hidden');
-        showAlert('🔴 You are offline. Entries will be saved locally.', 'warning');
-    });
-}
+    const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
+    if (defaultMoodBtn) defaultMoodBtn.classList.add('active');
+    if (Notification.permission === "granted") { notificationPermissionGranted = true; setupLocalNotifications(); }
+    updateAutoProductivityDisplay();
+});
 
 // ============================================
 // EXPOSE FUNCTIONS TO GLOBAL SCOPE
@@ -2382,37 +2045,8 @@ window.dismissInstallBanner = dismissInstallBanner;
 window.exportUserData = exportUserData;
 window.importUserData = importUserData;
 window.closeBackupModal = closeBackupModal;
-window.showExportOptions = showExportOptions;
-window.closeExportModal = closeExportModal;
-window.exportWithOptions = exportWithOptions;
 window.updateExportButton = updateExportButton;
-
-// ============================================
-// INITIALIZATION
-// ============================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    initTheme();
-    checkMobileCompatibility();
-    initOfflineIndicator();
-    initTouchGestures();
-    
-    checkRememberedUser();
-    const hasSession = checkExistingSession();
-    
-    if (!hasSession) {
-        document.getElementById("login-screen").classList.remove("hidden");
-        document.getElementById("main-screen").classList.add("hidden");
-        document.getElementById("history-screen").classList.add("hidden");
-    }
-    
-    const defaultMoodBtn = document.querySelector('[data-mood="😊"]');
-    if (defaultMoodBtn) defaultMoodBtn.classList.add('active');
-    
-    if (Notification.permission === "granted") { 
-        notificationPermissionGranted = true; 
-        setupLocalNotifications(); 
-    }
-    
-    updateAutoProductivityDisplay();
-});
+window.savePersistentData = savePersistentData;
+window.loadPersistentData = loadPersistentData;
+window.clearPersistentData = clearPersistentData;
+window.checkAndTriggerAutoSave = checkAndTriggerAutoSave;
