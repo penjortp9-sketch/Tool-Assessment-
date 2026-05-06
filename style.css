@@ -1134,3 +1134,118 @@ body {
         font-size: 0.8rem;
     }
 }
+/* Username validation styles - Add to existing style.css */
+.username-status {
+    padding: 4px 0;
+    font-size: 0.75rem;
+}
+
+.username-status.valid {
+    color: var(--success);
+}
+
+.username-status.invalid {
+    color: var(--danger);
+}
+
+.username-status.warning {
+    color: var(--warning);
+}
+
+.user-selector-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.existing-user-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--primary);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    margin-left: 8px;
+}
+
+#existing-user-select {
+    margin-top: 8px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-dark);
+    font-family: 'Sora', sans-serif;
+    cursor: pointer;
+}
+
+#existing-user-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.1);
+}
+
+/* User info display in dashboard */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 8px 16px;
+    border-radius: 50px;
+    backdrop-filter: blur(5px);
+}
+
+.user-details {
+    text-align: right;
+}
+
+.user-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.user-status {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    box-shadow: var(--shadow-sm);
+}
+
+/* User Manager Modal */
+#user-manager-modal .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+/* Responsive for user info */
+@media (max-width: 768px) {
+    .user-info {
+        padding: 6px 12px;
+    }
+    
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .user-name {
+        font-size: 0.8rem;
+    }
+    
+    .user-status {
+        font-size: 0.6rem;
+    }
+}

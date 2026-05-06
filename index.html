@@ -42,17 +42,25 @@
                     </div>
                 </div>
 
-                <!-- Name Entry Form -->
+                <!-- Name Entry Form with Uniqueness Check -->
                 <div id="name-form" class="auth-form active">
                     <div class="welcome-text">Welcome! ✨</div>
                     
                     <div class="form-group">
                         <label class="form-label">Your Name</label>
                         <input type="text" id="user-name" placeholder="Enter your name" class="form-input" autocomplete="name">
-                        <small class="input-hint">Enter your name to get started</small>
+                        <small class="input-hint">Enter your unique username to continue with your history</small>
+                        <div id="username-status" class="username-status" style="font-size: 0.75rem; margin-top: 5px;"></div>
                     </div>
                     
-                    <button onclick="startSession()" class="btn btn-primary">Start →</button>
+                    <div class="user-selector-section" id="user-selector-section" style="display: none;">
+                        <label class="form-label">Or select existing user:</label>
+                        <select id="existing-user-select" class="form-input" onchange="selectExistingUser()">
+                            <option value="">-- Select a user --</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="startSession()" class="btn btn-primary" id="start-btn">Start →</button>
                 </div>
 
                 <div class="notification-section">
