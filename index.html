@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Chimla Tabdew | Multi-Task Blocks & Productivity Self-Assessment</title>
+    
+    <!-- PWA Meta Tags (Embedded - No external files needed) -->
+    <meta name="theme-color" content="#1B4D3E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Chimla Tabdew">
+    
+    <!-- Dynamic PWA Manifest (Embedded) -->
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Chimla%20Tabdew%20-%20Productivity%20Companion%22,%22short_name%22:%22Chimla%20Tabdew%22,%22description%22:%22Track%20tasks,%20blocks,%20distractions%20%26%20boost%20your%20productivity%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22theme_color%22:%22%231B4D3E%22,%22background_color%22:%22%230F3028%22,%22orientation%22:%22portrait%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20fill='%231B4D3E'/%3E%3Ctext%20x='50'%20y='67'%20font-size='50'%20text-anchor='middle'%20fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22any%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%20maskable%22}],%22shortcuts%22:[{%22name%22:%22Quick%20Log%22,%22short_name%22:%22Log%22,%22description%22:%22Quickly%20log%20your%20productivity%22,%22url%22:%22/?action=quick-log%22},{%22name%22:%22View%20History%22,%22short_name%22:%22History%22,%22description%22:%22View%20your%20productivity%20history%22,%22url%22:%22/?action=history%22}]}">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231B4D3E'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='%23D4A574'%3E📊%3C/text%3E%3C/svg%3E">
+    
+    <!-- Google Fonts & External Stylesheets -->
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-pattern"></div>
+    <div class="container">
+        <!-- Name Entry Screen -->
+        <div id="name-screen" class="screen login-screen">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1 class="logo-title">Chimla Tabdew</h1>
+                    <div class="logo-subtitle">Personal Productivity Companion</div>
+                    
+                    <!-- INFO BOX - Click to learn about the tool -->
+                    <div class="info-box" onclick="showToolGuide()">
+                        <div class="info-box-icon">📖</div>
+                        <div class="info-box-content">
+                            <div class="info-box-title">Click here first to know about this tool and me</div>
+                            <div class="info-box-text">Learn how Chimla Tabdew helps you track tasks, blocks, distractions & productivity →</div>
+                        </div>
+                        <div class="info-box-arrow">▶</div>
+                    </div>
+                </div>
+
+                <!-- Name Entry Form -->
+                <div id="name-form" class="auth-form active">
+                    <div class="welcome-text">Welcome! ✨</div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Your Name</label>
+                        <input type="text" id="user-name" placeholder="Enter your name" class="form-input" autocomplete="name">
+                        <small class="input-hint">Enter your name to get started</small>
+                    </div>
+                    
+                    <button onclick="startSession()" class="btn btn-primary">Start →</button>
+                </div>
+
+                <div class="notification-section">
+                    <button type="button" onclick="requestNotificationPermission()" class="btn btn-secondary" style="width: 100%;">
+                        🔔 Enable Daily Reminders
+                    </button>
+                    <p class="notification-hint">Get notified to log your daily productivity</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOOL GUIDE MODAL POPUP -->
+        <div id="tool-guide-modal" class="modal hidden">
+            <div class="modal-content guide-modal-content">
+                <button onclick="closeToolGuide()" class="modal-close">×</button>
+                
+                <!-- WHY THIS TOOL SECTION -->
+                <div class="why-this-tool">
+                    <div class="why-icon">💡</div>
+                    <h2 class="why-title">Chimla Tabdew – Why I Built This</h2>
+                    <p class="why-text">
+                        My name is Tshering Penjor, an intern at Bhutan Data Scientist, and I built Chimla Tabdew because I was losing my days to distractions and didn't even realize it. Every morning, I'd sit down with big plans, but by evening, I couldn't tell you where the hours went, notifications pulled me away, random thoughts derailed me, fatigue made me give up, and the worst part was that I had no proof of what was happening, just a vague feeling of failure. I needed something that would show me the truth, not just track time, but track everything my tasks, my blocks, my ratings, and every single distraction that stole my focus. This tool is my way of combining what I'm learning about data with a real problem I face every day, because if data can solve business problems, why can't it solve my productivity problem too?
+                    </p>
+                </div>
+
+                <div class="guide-header">
+                    <span class="guide-icon">🧠</span>
+                    <h2 class="guide-title">How to Use Chimla Tabdew</h2>
+                    <p class="guide-subtitle">Your complete productivity companion</p>
+                </div>
+                <div class="guide-content">
+                    <div class="guide-section">
+                        <div class="guide-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>📝 Add Your Tasks</h4>
+                                <p>Type your daily tasks in the "Add a task" field and click +. These will be available to assign to work blocks.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>⏰ Set Work Blocks</h4>
+                                <p>Enter total work hours and number of blocks. Click ⚡ to auto-generate block schedule.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>🎯 Assign Tasks to Blocks</h4>
+                                <p>For each block, select tasks from dropdown and click "Add Task". Mark blocks as completed when done.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h4>⭐ Rate Your Performance</h4>
+                                <p>After completing a block, click "Rate Block" to rate each task (1-10). Your productivity score auto-calculates.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <h4>🚫 Track Distractions</h4>
+                                <p>Select or add custom distractions that occurred during each block. View insights to improve focus.</p>
+                            </div>
+                        </div>
+                        <div class="guide-step">
+                            <div class="step-number">6</div>
+                            <div class="step-content">
+                                <h4>📊 Review History</h4>
+                                <p>Click "History" to see charts, trends, and download CSV reports of your productivity journey.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="guide-tip">
+                        <span class="tip-icon">💡</span>
+                        <div class="tip-text">
+                            <strong>Pro Tip:</strong> Enable daily reminders to never miss logging your productivity. High productivity days (score ≥ 8) trigger confetti celebration!
+                        </div>
+                    </div>
+                </div>
+                <button onclick="closeToolGuide()" class="btn btn-primary guide-close-btn">Got it! Let's start →</button>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="main-screen" class="screen main-screen hidden">         
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <div>
+                        <h2 class="greeting">Good morning, <span id="greeting-name"></span>!</h2>
+                        <p class="location-date">THIMPHU • BHUTAN • <span id="current-date"></span></p>
+                    </div>
+                    <div class="header-buttons">
+                        <button id="theme-toggle-btn" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+                        <button onclick="showHistoryScreen()" class="btn btn-secondary">📊 History</button>
+                        <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                    </div>
+                </div>
+                <div id="quote-container" class="quote-card">
+                    <p id="daily-quote">"Loading inspiration..."</p>
+                </div>
+            </header>
+
+            <!-- Reminder Settings Card -->
+            <div id="reminder-settings" class="reminder-settings-card" style="display: none;">
+                <div class="reminder-header">
+                    <span>🔔 Notification Settings</span>
+                    <button onclick="toggleReminderSettings()" class="btn-icon-small">⚙️</button>
+                </div>
+                <div class="reminder-controls">
+                    <label class="checkbox-label"><input type="checkbox" id="daily-reminder-toggle" onchange="toggleDailyReminder()"><span>Daily reminder to log entry</span></label>
+                    <div class="reminder-time-select" id="reminder-time-group" style="display: none;">
+                        <label>Reminder time:</label>
+                        <input type="time" id="reminder-time" value="20:00" onchange="saveReminderTime()">
+                    </div>
+                    <label class="checkbox-label"><input type="checkbox" id="weekly-report-toggle" onchange="toggleWeeklyReport()"><span>Weekly summary report (Sundays)</span></label>
+                    <label class="checkbox-label"><input type="checkbox" id="nudge-toggle" onchange="toggleNudge()"><span>Gentle nudge if I miss logging (3 days)</span></label>
+                </div>
+            </div>
+
+            <!-- Work Time Suggestion Card -->
+            <div id="work-time-suggestion" class="work-time-suggestion-card" style="display: none;"></div>
+
+            <form id="planning-form" class="planning-form">
+                <h3 class="section-title">Daily Planning</h3>
+                
+                <div class="form-section">
+                    <label class="form-label">How are you feeling today?</label>
+                    <div class="mood-container">
+                        <button type="button" class="mood-btn" data-mood="🔥" onclick="setMood('🔥', this)"><span class="mood-emoji">🔥</span><span class="mood-text">Focused</span></button>
+                        <button type="button" class="mood-btn" data-mood="😊" onclick="setMood('😊', this)"><span class="mood-emoji">😊</span><span class="mood-text">Happy</span></button>
+                        <button type="button" class="mood-btn" data-mood="😴" onclick="setMood('😴', this)"><span class="mood-emoji">😴</span><span class="mood-text">Tired</span></button>
+                    </div>
+                    <input type="hidden" id="selected-mood" value="😊">
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">What are your specific tasks today?</label>
+                    <div class="task-input-group">
+                        <input type="text" id="task-input" placeholder="Add a task..." class="form-input">
+                        <button type="button" onclick="addTask()" class="btn btn-icon">+</button>
+                    </div>
+                    <ul id="task-checklist" class="task-list"></ul>
+                    <input type="hidden" id="tasks">
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">How many hours will you work today?</label>
+                    <input type="number" id="total-hours" class="form-input time-input" min="1" max="12" value="6" required>
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">Divide work into how many blocks?</label>
+                    <input type="number" id="blocks" class="form-input time-input" min="1" max="8" value="3" required>
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">Your work blocks</label>
+                    <div class="block-input-wrapper">
+                        <input type="text" id="block-tasks" placeholder="Auto-generated blocks will appear here" class="form-input" required>
+                        <button type="button" onclick="autoGenerateBlocksManual()" class="btn btn-icon">⚡</button>
+                    </div>
+                </div>
+
+                <!-- MULTI-TASK BLOCK ASSIGNMENT SECTION -->
+                <div id="blockAssignmentSection" class="form-section block-assignment-section" style="border-left: 4px solid var(--primary); background: rgba(27,77,62,0.03); padding: 16px; border-radius: 16px; margin-bottom: 28px;">
+                    <label class="form-label" style="font-size: 1.1rem;">🎯 Assign multiple tasks to each block (select & add tasks)</label>
+                    <div id="blockAssignmentContainer" class="block-assignment-container"></div>
+                    
+                    <div id="blockRatingSummary" class="block-rating-summary" style="margin-top: 15px; padding: 12px; background: var(--bg-light); border-radius: 12px; display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;">⭐ Block Ratings Summary</span>
+                            <button type="button" onclick="showAllRatingsModal()" class="btn-icon-small" style="font-size: 0.8rem;">View All</button>
+                        </div>
+                        <div id="ratingsSummaryText" style="font-size: 0.85rem; margin-top: 8px; color: var(--text-muted);"></div>
+                    </div>
+                    
+                    <div class="assignment-actions" style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+                        <button type="button" id="finalizeBlockTasksBtn" class="btn btn-primary" style="background: var(--accent);">✅ Mark Block Tasks as Finished</button>
+                        <button type="button" onclick="resetAllBlockAssignments()" class="btn btn-secondary">🔄 Reset All</button>
+                        <span id="assignmentStatusMsg" style="font-size: 0.8rem; align-self: center; color: var(--text-muted);"></span>
+                    </div>
+                </div>
+
+                <!-- DISTRACTION TRACKER SECTION -->
+                <div id="distractionTrackerSection" class="form-section distraction-tracker-section" style="border-left: 4px solid #F59E0B; background: rgba(245,158,11,0.08); padding: 16px; border-radius: 16px; margin-bottom: 28px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 1.1rem; margin-bottom: 0;">🚫 Distraction Tracker</label>
+                        <button type="button" onclick="showDistractionInsightsModal()" class="btn-icon-small" style="font-size: 0.8rem; background: rgba(245,158,11,0.2); padding: 6px 12px; border-radius: 20px;">📊 View Insights</button>
+                    </div>
+                    <div id="distractionBlocksContainer" style="min-height: 100px;"></div>
+                    
+                    <div id="distractionPatternsCard" style="margin-top: 16px; padding: 12px; background: var(--bg-light); border-radius: 12px; display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;">📊 Your Distraction Patterns</span>
+                        </div>
+                        <div id="distractionPatternsText" style="font-size: 0.85rem; margin-top: 8px; color: var(--text-muted);"></div>
+                        <div id="distractionSuggestionsText" style="font-size: 0.85rem; margin-top: 8px; color: #F59E0B;"></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">Overall Daily Productivity Score <span style="font-size:0.85rem; color:var(--text-muted);">(Auto-calculated from block ratings)</span></label>
+                    <div class="rating-wrapper" style="justify-content: center; background: var(--bg-light); padding: 16px; border-radius: 12px;">
+                        <span id="auto-productivity-score" class="rating-display" style="font-size: 2.8rem; color: var(--primary);">—</span>
+                        <span class="rating-max" style="font-size: 1.4rem;">/10</span>
+                    </div>
+                    <small id="score-breakdown" style="display: block; text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.85rem;">
+                        Score appears after rating completed blocks
+                    </small>
+                </div>
+
+                <div class="form-section">
+                    <label class="form-label">Comments & Reflections</label>
+                    <textarea id="comments" class="form-input form-textarea" rows="4" placeholder="What went well? Any distractions?"></textarea>
+                </div>
+
+                <button type="button" onclick="saveEntry()" class="btn btn-primary btn-large" id="saveEntryBtn">Save Today's Entry</button>
+            </form>
+
+            <div id="summary" class="summary-card hidden">
+                <h3 class="section-title">Today's Plan Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><span class="summary-label">Tasks</span><p id="sum-tasks" class="summary-value"></p></div>
+                    <div class="summary-item"><span class="summary-label">Work Duration</span><p id="sum-hours" class="summary-value"></p></div>
+                    <div class="summary-item"><span class="summary-label">Blocks</span><p class="summary-value"><span id="sum-blocks"></span> × <span id="sum-per-block"></span>h</p></div>
+                    <div class="summary-item"><span class="summary-label">Productivity Score</span><p id="sum-rating" class="summary-value"></p></div>
+                </div>
+                <div class="summary-blocks"><span class="summary-label">Block Schedule</span><p id="sum-block-tasks" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Block Task Assignment & Ratings</span><p id="sum-block-assignment" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Distractions Logged</span><p id="sum-distractions" class="summary-value"></p></div>
+                <div class="summary-blocks"><span class="summary-label">Notes</span><p id="sum-comments" class="summary-value"></p></div>
+            </div>
+
+            <div class="reflection-card">
+                <h3 class="section-title">What I Learned Today</h3>
+                <ul id="lessons-list" class="lessons-list"></ul>
+            </div>
+        </div>
+
+        <!-- History Screen -->
+        <div id="history-screen" class="screen history-screen hidden">
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <div><h2 class="greeting">📊 Your Results History</h2><p class="location-date">Track your productivity journey</p></div>
+                    <div class="header-buttons">
+                        <button id="history-theme-toggle" class="btn btn-secondary theme-toggle-btn" onclick="toggleTheme()">🌙 Dark Mode</button>
+                        <button onclick="downloadHistoryCSV()" class="btn btn-primary">📥 Download CSV</button>
+                        <button onclick="clearAllHistory()" class="btn btn-secondary btn-danger">🗑️ Clear All</button>
+                        <button onclick="backToDashboard()" class="btn btn-secondary">← Back</button>
+                    </div>
+                </div>
+            </header>
+            <div class="history-container">
+                <div class="stats-summary"><h3 class="section-title">Your Statistics</h3><div class="stats-grid" id="statsGrid"></div></div>
+                <div class="charts-section"><h3 class="section-title">📊 Analytics Dashboard</h3><div class="chart-tabs"><button class="chart-tab active" onclick="switchChartTab('productivity', event)">📈 Productivity Trend</button><button class="chart-tab" onclick="switchChartTab('mood', event)">😊 Mood Distribution</button><button class="chart-tab" onclick="switchChartTab('heatmap', event)">🔥 Productivity Heatmap</button><button class="chart-tab" onclick="switchChartTab('correlation', event)">📉 Hours vs Productivity</button><button class="chart-tab" onclick="switchChartTab('blockratings', event)">⭐ Block Ratings</button><button class="chart-tab" onclick="switchChartTab('distractions', event)">🚫 Distractions</button></div>
+                <div id="productivity-chart-container" class="chart-container active"><canvas id="productivityTrendChart"></canvas><div class="chart-insight" id="trend-insight"></div></div>
+                <div id="mood-chart-container" class="chart-container"><canvas id="moodDistributionChart"></canvas><div class="chart-insight" id="mood-insight"></div></div>
+                <div id="heatmap-chart-container" class="chart-container"><div id="heatmap-calendar" class="heatmap-calendar"></div><div class="chart-insight" id="heatmap-insight"></div></div>
+                <div id="correlation-chart-container" class="chart-container"><canvas id="correlationChart"></canvas><div class="chart-insight" id="correlation-insight"></div></div>
+                <div id="blockratings-chart-container" class="chart-container"><canvas id="blockRatingsChart"></canvas><div class="chart-insight" id="blockratings-insight"></div></div>
+                <div id="distractions-chart-container" class="chart-container"><canvas id="distractionChart"></canvas><div class="chart-insight" id="distraction-insight"></div></div></div>
+                <div class="filter-section"><h3 class="section-title">Filter Results</h3><div class="filter-controls"><select id="mood-filter" class="filter-input" onchange="filterHistory()"><option value="">All Moods</option><option value="🔥">🔥 Focused</option><option value="😊">😊 Happy</option><option value="😴">😴 Tired</option></select><select id="productivity-filter" class="filter-input" onchange="filterHistory()"><option value="">All Productivity Levels</option><option value="high">High (8-10)</option><option value="medium">Medium (5-7)</option><option value="low">Low (1-4)</option></select><button onclick="resetFilters()" class="btn btn-secondary">Reset Filters</button></div></div>
+                <div class="history-list-container"><h3 class="section-title">Entries</h3><div id="history-list" class="history-list"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal hidden"><div class="modal-content"><button onclick="closeDetailModal()" class="modal-close">×</button><div id="detail-content" class="detail-content"></div></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="script.js"></script>
+    
+    <!-- Embedded Service Worker Registration (No external sw.js needed) -->
+    <script>
+    (function registerEmbeddedServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        
+        // Complete Service Worker Code Embedded as String
+        const swCode = `const CACHE_NAME = 'chimla-tabdew-v1';
+const urlsToCache = ['/', '/new.html', '/style.css', '/script.js', 'https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:wght@700&display=swap', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'];
+
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(caches.keys().then(cacheNames => Promise.all(cacheNames.map(cacheName => { if (cacheName !== CACHE_NAME) return caches.delete(cacheName); }))).then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', event => {
+    event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+});
+
+self.addEventListener('sync', event => {
+    if (event.tag === 'sync-entries') {
+        event.waitUntil((async () => {
+            const cache = await caches.open('pending-entries');
+            const requests = await cache.keys();
+            for (const request of requests) {
+                try {
+                    const response = await fetch(request);
+                    if (response.ok) {
+                        await cache.delete(request);
+                        self.registration.showNotification('Chimla Tabdew', { body: 'Your offline entries have been synced! ✅', icon: 'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Crect width=\\'100\\' height=\\'100\\' fill=\\'%231B4D3E\\'/%3E%3Ctext x=\\'50\\' y=\\'67\\' font-size=\\'50\\' text-anchor=\\'middle\\' fill=\\'%23D4A574\\'%3E📊%3C/text%3E%3C/svg%3E', vibrate: [200, 100, 200] });
+                    }
+                } catch(e) {}
+            }
+        })());
+    }
+});
+
+self.addEventListener('push', event => {
+    const data = event.data.json();
+    event.waitUntil(self.registration.showNotification(data.title || 'Chimla Tabdew', { body: data.body || 'Time to log your productivity!', icon: 'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Crect width=\\'100\\' height=\\'100\\' fill=\\'%231B4D3E\\'/%3E%3Ctext x=\\'50\\' y=\\'67\\' font-size=\\'50\\' text-anchor=\\'middle\\' fill=\\'%23D4A574\\'%3E📊%3C/text%3E%3C/svg%3E', vibrate: [200, 100, 200], actions: [{ action: 'log', title: '📝 Quick Log' }, { action: 'snooze', title: '⏰ Remind Later' }, { action: 'view', title: '📊 View Stats' }] }));
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => { for (let client of windowClients) { if (client.url.includes('/') && 'focus' in client) { client.focus(); client.postMessage({ action: event.action }); return; } } if (clients.openWindow) return clients.openWindow('/'); }));
+});`;
+        
+        // Create blob from service worker code
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        
+        // Register the service worker
+        navigator.serviceWorker.register(swUrl)
+            .then(registration => {
+                console.log('✅ Chimla Tabdew PWA: Service Worker registered successfully');
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('📱 New version available! Refresh to update.');
+                        }
+                    });
+                });
+            })
+            .catch(error => console.error('❌ Service Worker registration failed:', error));
+        
+        // Handle messages from service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data.action === 'log' && window.quickLogWidget) {
+                window.quickLogWidget?.toggle();
+            } else if (event.data.action === 'view') {
+                showHistoryScreen();
+            }
+        });
+    })();
+    </script>
+    
+    <!-- PWA Install Prompt Handler -->
+    <script>
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show install banner after 3 seconds
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('installDismissed')) {
+                showInstallBanner();
+            }
+        }, 3000);
+    });
+    
+    function showInstallBanner() {
+        const banner = document.createElement('div');
+        banner.id = 'pwa-install-banner';
+        banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:1px solid var(--primary);animation:slideInUp 0.3s ease-out;';
+        banner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+                <div style="font-size:2rem;">📱</div>
+                <div style="flex:1;">
+                    <strong style="font-size:0.9rem;">Install Chimla Tabdew</strong>
+                    <small style="font-size:0.7rem;display:block;">Get app-like experience with offline support</small>
+                </div>
+                <button onclick="installPWA()" class="btn btn-primary btn-sm" style="padding:8px 16px;">Install</button>
+                <button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
+            </div>
+        `;
+        document.body.appendChild(banner);
+    }
+    
+    function installPWA() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                }
+                deferredPrompt = null;
+                document.getElementById('pwa-install-banner')?.remove();
+            });
+        }
+    }
+    
+    function dismissInstallBanner() {
+        document.getElementById('pwa-install-banner')?.remove();
+        localStorage.setItem('installDismissed', true);
+    }
+    
+    // Detect if already installed as PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        console.log('🎉 Chimla Tabdew is running as installed PWA');
+    }
+    </script>
+</body>
+</html>
