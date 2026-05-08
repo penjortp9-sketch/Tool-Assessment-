@@ -45,6 +45,117 @@ const distractionTypes = [
 ];
 
 // ============================================
+// USERNAME SYSTEM - PERSISTENT STORAGE (UPDATED)
+// ============================================
+
+// Get all existing usernames from localStorage
+function getAllUsernames() {
+    const users = localStorage.getItem('chimla_all_users');
+    if (!users) return [];
+    try {
+        return JSON.parse(users);
+    } catch(e) {
+        return [];
+    }
+}
+
+// Save a new username to the global list
+function saveUsernameToList(username) {
+    let users = getAllUsernames();
+    if (!users.includes(username)) {
+        users.push(username);
+        localStorage.setItem('chimla_all_users', JSON.stringify(users));
+    }
+    return users;
+}
+
+// Load all existing users into dropdown
+function loadExistingUsersDropdown() {
+    const users = getAllUsernames();
+    const select = document.getElementById('existing-user-select');
+    const section = document.getElementById('user-selector-section');
+    
+    if (users.length > 0 && section) {
+        section.style.display = 'block';
+        select.innerHTML = '<option value="">-- Select a user --</option>';
+        users.forEach(user => {
+            const history = getUserHistory(user);
+            const entryCount = history.length;
+            select.innerHTML += `<option value="${escapeHtml(user)}">${escapeHtml(user)} (${entryCount} entries)</option>`;
+        });
+    } else if (section) {
+        section.style.display = 'none';
+    }
+}
+
+// Select existing user from dropdown
+function selectExistingUser() {
+    const select = document.getElementById('existing-user-select');
+    const userNameInput = document.getElementById('user-name');
+    
+    if (select.value) {
+        userNameInput.value = select.value;
+        validateUsernameOnInput();
+        setTimeout(() => {
+            startSession();
+        }, 300);
+    }
+}
+
+// Validate username on input (check if exists)
+function validateUsernameOnInput() {
+    const userNameInput = document.getElementById('user-name');
+    const statusDiv = document.getElementById('username-status');
+    const startBtn = document.getElementById('start-btn');
+    const userName = userNameInput.value.trim();
+    
+    if (userName === '') {
+        statusDiv.innerHTML = '';
+        statusDiv.className = 'username-status';
+        if (startBtn) startBtn.disabled = false;
+        return;
+    }
+    
+    if (userName.length < 2) {
+        statusDiv.innerHTML = '⚠️ Username must be at least 2 characters';
+        statusDiv.className = 'username-status invalid';
+        if (startBtn) startBtn.disabled = true;
+        return;
+    }
+    
+    const validRegex = /^[a-zA-Z0-9\s\-_\.]+$/;
+    if (!validRegex.test(userName)) {
+        statusDiv.innerHTML = '⚠️ Username can only contain letters, numbers, spaces, and . - _';
+        statusDiv.className = 'username-status invalid';
+        if (startBtn) startBtn.disabled = true;
+        return;
+    }
+    
+    if (isUsernameExists(userName)) {
+        const history = getUserHistory(userName);
+        statusDiv.innerHTML = `⚠️ "${escapeHtml(userName)}" already exists. You will continue with your existing history (${history.length} entries).`;
+        statusDiv.className = 'username-status warning';
+        if (startBtn) startBtn.disabled = false;
+    } else {
+        statusDiv.innerHTML = '✓ New username. A fresh history will be created for you.';
+        statusDiv.className = 'username-status valid';
+        if (startBtn) startBtn.disabled = false;
+    }
+}
+
+// Check if username already exists
+function isUsernameExists(username) {
+    const users = getAllUsernames();
+    return users.includes(username);
+}
+
+// Get user's history
+function getUserHistory(username) {
+    const history = localStorage.getItem(`chimla_history_${username}`);
+    return history ? JSON.parse(history) : [];
+}
+
+// ============================================
 // NAME-ONLY AUTHENTICATION SYSTEM
 // ============================================
 
@@ -58,6 +169,9 @@ function startSession() {
     }
     
     currentUserName = userName;
+    
+    // Save username to master list
+    saveUsernameToList(userName);
     
     // Save to localStorage for session persistence
     localStorage.setItem('chimla_current_user', userName);
@@ -117,18 +231,25 @@ function getSystemTheme() {
 
 function updateDashboardUserInfo(userName) {
     const headerContent = document.querySelector('.header-content');
-    if (headerContent && !document.querySelector('.user-info')) {
-        const userInfoDiv = document.createElement('div');
-        userInfoDiv.className = 'user-info';
-        userInfoDiv.innerHTML = `
-            <div class="user-details">
-                <div class="user-name">${escapeHtml(userName)}</div>
-                <div class="user-status">Active User</div>
-            </div>
-            <div class="user-avatar">${getRandomAvatar()}</div>
-        `;
-        headerContent.appendChild(userInfoDiv);
-    }
+    const existingUserInfo = document.querySelector('.user-info');
+    if (existingUserInfo) existingUserInfo.remove();
+    
+    const userInfoDiv = document.createElement('div');
+    userInfoDiv.className = 'user-info';
+    
+    const history = getUserHistory(userName);
+    const entryCount = history.length;
+    
+    userInfoDiv.innerHTML = `
+        <div class="user-details">
+            <div class="user-name">${escapeHtml(userName)}</div>
+            <div class="user-status">${entryCount} entries · Active</div>
+        </div>
+        <div class="user-avatar">${getRandomAvatar()}</div>
+    `;
+    headerContent.appendChild(userInfoDiv);
+    
+    addUserManagerButton();
 }
 
 function getRandomAvatar() {
@@ -138,12 +259,72 @@ function getRandomAvatar() {
 
 function checkExistingSession() {
     const savedUserName = localStorage.getItem('chimla_current_user');
-    if (savedUserName) {
+    if (savedUserName && isUsernameExists(savedUserName)) {
         document.getElementById('user-name').value = savedUserName;
         startSession();
         return true;
     }
     return false;
+}
+
+// Add user manager button to dashboard
+function addUserManagerButton() {
+    const headerButtons = document.querySelector('.header-buttons');
+    if (headerButtons && !document.querySelector('#user-manager-btn')) {
+        const userBtn = document.createElement('button');
+        userBtn.id = 'user-manager-btn';
+        userBtn.className = 'btn btn-secondary';
+        userBtn.innerHTML = '👥 Users';
+        userBtn.onclick = showUserManager;
+        userBtn.title = 'Switch between user accounts';
+        headerButtons.appendChild(userBtn);
+    }
+}
+
+// Show user manager modal
+function showUserManager() {
+    const users = getAllUsernames();
+    if (users.length === 0) {
+        showAlert('No users found', 'warning');
+        return;
+    }
+    
+    let usersHtml = '<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">👥 All Users</h3><ul style="list-style: none; padding: 0;">';
+    users.forEach(user => {
+        const history = getUserHistory(user);
+        const entryCount = history.length;
+        const lastEntry = history.length > 0 ? new Date(history[history.length - 1].timestamp).toLocaleDateString() : 'No entries';
+        const isCurrent = (currentUserName === user);
+        usersHtml += `<li style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong>${escapeHtml(user)}</strong>${isCurrent ? ' <span style="color: var(--success);">✓ Current</span>' : ''}<br>
+                <small style="color: var(--text-muted);">${entryCount} entries · Last: ${lastEntry}</small>
+            </div>
+            ${!isCurrent ? `<button onclick="switchToUser('${escapeHtml(user)}')" class="btn btn-sm btn-primary" style="padding: 6px 12px;">Switch</button>` : '<span style="padding: 6px 12px; opacity: 0.5;">Current</span>'}
+        </li>`;
+    });
+    usersHtml += '</ul><button onclick="closeUserManager()" class="btn btn-secondary" style="width: 100%; margin-top: 15px;">Close</button></div>';
+    
+    const modalHtml = `<div id="user-manager-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10006;"><div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">${usersHtml}</div></div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Switch to a different user
+function switchToUser(username) {
+    closeUserManager();
+    localStorage.setItem('chimla_current_user', username);
+    document.getElementById("main-screen").classList.add("hidden");
+    document.getElementById("history-screen").classList.add("hidden");
+    document.getElementById("name-screen").classList.remove("hidden");
+    document.getElementById("user-name").value = username;
+    setTimeout(() => {
+        startSession();
+    }, 100);
+}
+
+// Close user manager modal
+function closeUserManager() {
+    document.getElementById('user-manager-modal')?.remove();
 }
 
 // ============================================
@@ -1210,6 +1391,7 @@ function logout() {
     blockCompletionMap = {};
     blockRatingMap = {};
     distractionLogs = {};
+    loadExistingUsersDropdown();
     showAlert('👋 Logged out!', 'success');
 }
 
@@ -1702,37 +1884,6 @@ function checkMobileCompatibility() {
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) console.log('🎉 Running as PWA');
 }
 
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    setTimeout(() => {
-        if (deferredPrompt && !localStorage.getItem('installDismissed') && !window.matchMedia('(display-mode: standalone)').matches) {
-            const banner = document.createElement('div');
-            banner.id = 'pwa-install-banner';
-            banner.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;background:var(--card-bg);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:10000;border:2px solid var(--primary);animation:slideInUp 0.3s ease-out;';
-            banner.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;"><div style="font-size:2rem;">📱</div><div style="flex:1;"><strong>Install Chimla Tabdew</strong><small style="font-size:0.7rem;display:block;">Get app-like experience</small></div><button onclick="installPWA()" class="btn btn-primary btn-sm">Install</button><button onclick="dismissInstallBanner()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button></div>`;
-            document.body.appendChild(banner);
-        }
-    }, 3000);
-});
-
-function installPWA() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') showAlert('🎉 Thanks for installing!', 'success');
-            deferredPrompt = null;
-            document.getElementById('pwa-install-banner')?.remove();
-        });
-    }
-}
-
-function dismissInstallBanner() {
-    document.getElementById('pwa-install-banner')?.remove();
-    localStorage.setItem('installDismissed', true);
-}
-
 // ============================================
 // INITIALIZATION
 // ============================================
@@ -1742,6 +1893,13 @@ document.addEventListener('DOMContentLoaded', function() {
     checkMobileCompatibility();
     initOfflineIndicator();
     initTouchGestures();
+    loadExistingUsersDropdown();
+    
+    const userNameInput = document.getElementById('user-name');
+    if (userNameInput) {
+        userNameInput.addEventListener('input', validateUsernameOnInput);
+    }
+    
     const hasSession = checkExistingSession();
     if (!hasSession) {
         document.getElementById("name-screen").classList.remove("hidden");
@@ -1798,8 +1956,6 @@ window.handleDistractionSelectChange = handleDistractionSelectChange;
 window.downloadHistoryCSV = downloadHistoryCSV;
 window.showToolGuide = showToolGuide;
 window.closeToolGuide = closeToolGuide;
-window.installPWA = installPWA;
-window.dismissInstallBanner = dismissInstallBanner;
 window.exportUserData = exportUserData;
 window.importUserData = importUserData;
 window.closeBackupModal = closeBackupModal;
@@ -1808,249 +1964,6 @@ window.savePersistentData = savePersistentData;
 window.loadPersistentData = loadPersistentData;
 window.clearPersistentData = clearPersistentData;
 window.checkAndTriggerAutoSave = checkAndTriggerAutoSave;
-// ============================================
-// USERNAME UNIQUENESS & SESSION MANAGEMENT
-// Add this entire block at the end of your script.js file
-// ============================================
-
-// Get all existing usernames from localStorage
-function getAllUsernames() {
-    const users = localStorage.getItem('chimla_all_users');
-    if (!users) return [];
-    try {
-        return JSON.parse(users);
-    } catch(e) {
-        return [];
-    }
-}
-
-// Save a new username to the global list
-function saveUsernameToList(username) {
-    let users = getAllUsernames();
-    if (!users.includes(username)) {
-        users.push(username);
-        localStorage.setItem('chimla_all_users', JSON.stringify(users));
-    }
-    return users;
-}
-
-// Load all existing users into dropdown
-function loadExistingUsersDropdown() {
-    const users = getAllUsernames();
-    const select = document.getElementById('existing-user-select');
-    const section = document.getElementById('user-selector-section');
-    
-    if (users.length > 0) {
-        section.style.display = 'block';
-        select.innerHTML = '<option value="">-- Select a user --</option>';
-        users.forEach(user => {
-            const history = getUserHistory(user);
-            const entryCount = history.length;
-            select.innerHTML += `<option value="${escapeHtml(user)}">${escapeHtml(user)} (${entryCount} entries)</option>`;
-        });
-    } else {
-        section.style.display = 'none';
-    }
-}
-
-// Select existing user from dropdown
-function selectExistingUser() {
-    const select = document.getElementById('existing-user-select');
-    const userNameInput = document.getElementById('user-name');
-    
-    if (select.value) {
-        userNameInput.value = select.value;
-        validateUsernameOnInput();
-        setTimeout(() => {
-            startSession();
-        }, 300);
-    }
-}
-
-// Validate username on input (check if exists)
-function validateUsernameOnInput() {
-    const userNameInput = document.getElementById('user-name');
-    const statusDiv = document.getElementById('username-status');
-    const startBtn = document.getElementById('start-btn');
-    const userName = userNameInput.value.trim();
-    
-    if (userName === '') {
-        statusDiv.innerHTML = '';
-        statusDiv.className = 'username-status';
-        if (startBtn) startBtn.disabled = false;
-        return;
-    }
-    
-    if (userName.length < 2) {
-        statusDiv.innerHTML = '⚠️ Username must be at least 2 characters';
-        statusDiv.className = 'username-status invalid';
-        if (startBtn) startBtn.disabled = true;
-        return;
-    }
-    
-    const validRegex = /^[a-zA-Z0-9\s\-_\.]+$/;
-    if (!validRegex.test(userName)) {
-        statusDiv.innerHTML = '⚠️ Username can only contain letters, numbers, spaces, and . - _';
-        statusDiv.className = 'username-status invalid';
-        if (startBtn) startBtn.disabled = true;
-        return;
-    }
-    
-    if (isUsernameExists(userName)) {
-        const history = getUserHistory(userName);
-        statusDiv.innerHTML = `⚠️ "${escapeHtml(userName)}" already exists. You will continue with your existing history (${history.length} entries).`;
-        statusDiv.className = 'username-status warning';
-        if (startBtn) startBtn.disabled = false;
-    } else {
-        statusDiv.innerHTML = '✓ New username. A fresh history will be created for you.';
-        statusDiv.className = 'username-status valid';
-        if (startBtn) startBtn.disabled = false;
-    }
-}
-
-// Check if username already exists
-function isUsernameExists(username) {
-    const users = getAllUsernames();
-    return users.includes(username);
-}
-
-// Get user's history
-function getUserHistory(username) {
-    const history = localStorage.getItem(`chimla_history_${username}`);
-    return history ? JSON.parse(history) : [];
-}
-
-// Add user manager button to dashboard
-function addUserManagerButton() {
-    const headerButtons = document.querySelector('.header-buttons');
-    if (headerButtons && !document.querySelector('#user-manager-btn')) {
-        const userBtn = document.createElement('button');
-        userBtn.id = 'user-manager-btn';
-        userBtn.className = 'btn btn-secondary';
-        userBtn.innerHTML = '👥 Users';
-        userBtn.onclick = showUserManager;
-        userBtn.title = 'Switch between user accounts';
-        headerButtons.appendChild(userBtn);
-    }
-}
-
-// Show user manager modal
-function showUserManager() {
-    const users = getAllUsernames();
-    if (users.length === 0) {
-        showAlert('No users found', 'warning');
-        return;
-    }
-    
-    let usersHtml = '<div style="max-height: 400px; overflow-y: auto;"><h3 style="margin-bottom: 15px;">👥 All Users</h3><ul style="list-style: none; padding: 0;">';
-    users.forEach(user => {
-        const history = getUserHistory(user);
-        const entryCount = history.length;
-        const lastEntry = history.length > 0 ? new Date(history[history.length - 1].timestamp).toLocaleDateString() : 'No entries';
-        const isCurrent = (currentUserName === user);
-        usersHtml += `<li style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <strong>${escapeHtml(user)}</strong>${isCurrent ? ' <span style="color: var(--success);">✓ Current</span>' : ''}<br>
-                <small style="color: var(--text-muted);">${entryCount} entries · Last: ${lastEntry}</small>
-            </div>
-            ${!isCurrent ? `<button onclick="switchToUser('${escapeHtml(user)}')" class="btn btn-sm btn-primary" style="padding: 6px 12px;">Switch</button>` : '<span style="padding: 6px 12px; opacity: 0.5;">Current</span>'}
-        </li>`;
-    });
-    usersHtml += '</ul><button onclick="closeUserManager()" class="btn btn-secondary" style="width: 100%; margin-top: 15px;">Close</button></div>';
-    
-    const modalHtml = `<div id="user-manager-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10006;"><div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">${usersHtml}</div></div>`;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-// Switch to a different user
-function switchToUser(username) {
-    closeUserManager();
-    localStorage.setItem('chimla_current_user', username);
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("history-screen").classList.add("hidden");
-    document.getElementById("name-screen").classList.remove("hidden");
-    document.getElementById("user-name").value = username;
-    setTimeout(() => {
-        startSession();
-    }, 100);
-}
-
-// Close user manager modal
-function closeUserManager() {
-    document.getElementById('user-manager-modal')?.remove();
-}
-
-// Modified logout function - Replace your existing logout function with this one
-window.logout = function() {
-    localStorage.removeItem('chimla_current_user');
-    currentUserName = null;
-    
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("history-screen").classList.add("hidden");
-    document.getElementById("name-screen").classList.remove("hidden");
-    
-    document.getElementById("user-name").value = '';
-    const statusDiv = document.getElementById('username-status');
-    if (statusDiv) {
-        statusDiv.innerHTML = '';
-        statusDiv.className = 'username-status';
-    }
-    
-    taskList = [];
-    blockTasksMap = {};
-    blockCompletionMap = {};
-    blockRatingMap = {};
-    distractionLogs = {};
-    
-    loadExistingUsersDropdown();
-    
-    showAlert('👋 Logged out!', 'success');
-}
-
-// Modified updateDashboardUserInfo to include entry count
-window.updateDashboardUserInfo = function(userName) {
-    const headerContent = document.querySelector('.header-content');
-    const existingUserInfo = document.querySelector('.user-info');
-    if (existingUserInfo) existingUserInfo.remove();
-    
-    const userInfoDiv = document.createElement('div');
-    userInfoDiv.className = 'user-info';
-    
-    const history = getUserHistory(userName);
-    const entryCount = history.length;
-    
-    userInfoDiv.innerHTML = `
-        <div class="user-details">
-            <div class="user-name">${escapeHtml(userName)}</div>
-            <div class="user-status">${entryCount} entries · Active</div>
-        </div>
-        <div class="user-avatar">${getRandomAvatar()}</div>
-    `;
-    headerContent.appendChild(userInfoDiv);
-    
-    addUserManagerButton();
-}
-
-// Initialize username system on page load
-function initUsernameSystem() {
-    loadExistingUsersDropdown();
-    
-    const userNameInput = document.getElementById('user-name');
-    if (userNameInput) {
-        userNameInput.addEventListener('input', validateUsernameOnInput);
-    }
-    
-    const savedUserName = localStorage.getItem('chimla_current_user');
-    if (savedUserName && isUsernameExists(savedUserName)) {
-        document.getElementById('user-name').value = savedUserName;
-        startSession();
-        return true;
-    }
-    return false;
-}
-
-// Override the original startSession to include uniqueness check
-// Keep your original startSession function, just add these lines at the beginning:
-// In your existing startSession function, add the username saving logic:
-// Add this line after setting currentUserName = userName:
-// saveUsernameToList(userName);
+window.selectExistingUser = selectExistingUser;
+window.switchToUser = switchToUser;
+window.closeUserManager = closeUserManager;
