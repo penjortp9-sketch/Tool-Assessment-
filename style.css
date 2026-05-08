@@ -740,6 +740,135 @@ body {
     .why-text { font-size: 0.8rem; }
 }
 
+/* ===== BLOCK TIMER STYLES ===== */
+.block-timer-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(27,77,62,0.06) 0%, rgba(212,165,116,0.06) 100%);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.block-timer-display {
+    font-family: 'Sora', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--primary);
+    min-width: 80px;
+    letter-spacing: 2px;
+    transition: color 0.3s ease;
+}
+
+.block-timer-display.timer-warning {
+    color: var(--warning);
+    animation: timerPulse 1s infinite;
+}
+
+.block-timer-display.timer-danger {
+    color: var(--danger);
+    animation: timerPulse 0.5s infinite;
+}
+
+.block-timer-display.timer-done {
+    color: var(--success);
+}
+
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.block-timer-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.btn-timer {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.btn-timer-start {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+}
+.btn-timer-start:hover { transform: scale(1.04); opacity: 0.9; }
+
+.btn-timer-pause {
+    background: var(--warning);
+    color: white;
+}
+.btn-timer-pause:hover { transform: scale(1.04); opacity: 0.9; }
+
+.btn-timer-reset {
+    background: var(--bg-light);
+    color: var(--text-dark);
+    border: 1px solid var(--border-color);
+}
+.btn-timer-reset:hover { background: var(--border-color); transform: scale(1.04); }
+
+.block-timer-notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 18px 28px;
+    border-radius: 16px;
+    z-index: 10010;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    animation: slideInDown 0.4s ease-out;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+}
+.block-timer-notification .notif-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.block-timer-notification .notif-msg {
+    font-size: 0.85rem;
+    opacity: 0.92;
+    margin-bottom: 12px;
+}
+.block-timer-notification .notif-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.block-timer-notification .notif-btn {
+    padding: 7px 18px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.notif-btn-primary { background: white; color: var(--primary); }
+.notif-btn-primary:hover { background: var(--accent-light); }
+.notif-btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4) !important; }
+.notif-btn-secondary:hover { background: rgba(255,255,255,0.3); }
+
 /* PWA & Install Banner */
 #pwa-install-banner {
     position: fixed;
