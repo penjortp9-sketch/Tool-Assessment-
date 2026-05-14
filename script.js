@@ -670,8 +670,8 @@ function autoGenerateBlocksManual() {
     
     // Reset all timer states when blocks change (new duration)
     for (let idx in blockTimerState) {
-        if (blockTimerState[idx] && blockTimerState[idx].intervalId) {
-            clearInterval(blockTimerState[idx].intervalId);
+        if (blockTimerState[idx] && blockTimerState[idx].animationFrameId) {
+            cancelAnimationFrame(blockTimerState[idx].animationFrameId);
         }
     }
     blockTimerState = {};
@@ -1922,10 +1922,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// BLOCK TIMER SYSTEM
+// BLOCK TIMER SYSTEM - OPTIMIZED VERSION (UPDATED)
 // ============================================
 
-// blockTimerState[blockIdx] = { totalSeconds, remainingSeconds, intervalId, running }
 let blockTimerState = {};
 
 function getBlockDurationSeconds(blockIdx) {
@@ -1946,9 +1945,10 @@ function getBlockDurationSeconds(blockIdx) {
 }
 
 function formatTimerDisplay(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+    const absSeconds = Math.abs(seconds);
+    const h = Math.floor(absSeconds / 3600);
+    const m = Math.floor((absSeconds % 3600) / 60);
+    const s = absSeconds % 60;
     if (h > 0) {
         return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     }
@@ -1962,7 +1962,9 @@ function initBlockTimer(blockIdx) {
             totalSeconds: totalSec,
             remainingSeconds: totalSec,
             intervalId: null,
-            running: false
+            running: false,
+            lastTickTime: null,
+            animationFrameId: null
         };
     }
 }
@@ -1970,43 +1972,68 @@ function initBlockTimer(blockIdx) {
 function startBlockTimer(blockIdx) {
     initBlockTimer(blockIdx);
     const state = blockTimerState[blockIdx];
+    
     if (state.running) return;
     if (state.remainingSeconds <= 0) {
         showAlert(`⏱️ Block ${blockIdx + 1} timer already done. Reset to restart.`, 'warning');
         return;
     }
+    
     state.running = true;
-    state.intervalId = setInterval(() => {
-        state.remainingSeconds--;
-        updateTimerUI(blockIdx);
-        if (state.remainingSeconds <= 0) {
-            clearInterval(state.intervalId);
-            state.intervalId = null;
-            state.running = false;
-            onBlockTimerComplete(blockIdx);
+    state.lastTickTime = performance.now();
+    
+    function tick(now) {
+        if (!state.running) return;
+        
+        const delta = now - state.lastTickTime;
+        if (delta >= 1000) {
+            const secondsToSubtract = Math.floor(delta / 1000);
+            state.remainingSeconds -= secondsToSubtract;
+            state.lastTickTime = now;
+            
+            updateTimerUI(blockIdx);
+            
+            if (state.remainingSeconds <= 0) {
+                state.running = false;
+                if (state.animationFrameId) cancelAnimationFrame(state.animationFrameId);
+                onBlockTimerComplete(blockIdx);
+                return;
+            }
         }
-    }, 1000);
+        
+        state.animationFrameId = requestAnimationFrame(tick);
+    }
+    
+    if (state.animationFrameId) cancelAnimationFrame(state.animationFrameId);
+    state.animationFrameId = requestAnimationFrame(tick);
+    
     updateTimerUI(blockIdx);
 }
 
 function pauseBlockTimer(blockIdx) {
     const state = blockTimerState[blockIdx];
     if (!state) return;
-    if (state.intervalId) {
-        clearInterval(state.intervalId);
-        state.intervalId = null;
-    }
+    
     state.running = false;
+    if (state.animationFrameId) {
+        cancelAnimationFrame(state.animationFrameId);
+        state.animationFrameId = null;
+    }
+    
     updateTimerUI(blockIdx);
 }
 
 function resetBlockTimer(blockIdx) {
     const state = blockTimerState[blockIdx];
     if (!state) return;
-    if (state.intervalId) clearInterval(state.intervalId);
-    state.intervalId = null;
+    
     state.running = false;
+    if (state.animationFrameId) {
+        cancelAnimationFrame(state.animationFrameId);
+        state.animationFrameId = null;
+    }
     state.remainingSeconds = state.totalSeconds;
+    state.lastTickTime = null;
     updateTimerUI(blockIdx);
 }
 
@@ -2021,15 +2048,16 @@ function updateTimerUI(blockIdx) {
 
     display.textContent = formatTimerDisplay(state.remainingSeconds);
 
-    // Color coding
     display.classList.remove('timer-warning', 'timer-danger', 'timer-done');
-    const pct = state.remainingSeconds / state.totalSeconds;
     if (state.remainingSeconds <= 0) {
         display.classList.add('timer-done');
-    } else if (pct <= 0.1) {
-        display.classList.add('timer-danger');
-    } else if (pct <= 0.25) {
-        display.classList.add('timer-warning');
+    } else {
+        const pct = state.remainingSeconds / state.totalSeconds;
+        if (pct <= 0.1) {
+            display.classList.add('timer-danger');
+        } else if (pct <= 0.25) {
+            display.classList.add('timer-warning');
+        }
     }
 
     if (startBtn) startBtn.style.display = state.running ? 'none' : 'inline-block';
@@ -2041,7 +2069,8 @@ function onBlockTimerComplete(blockIdx) {
     const hasNextBlock = blockIdx + 1 < blocksCount;
     const blockName = getBlockNameByIndex(blockIdx);
 
-    // Browser notification
+    updateTimerUI(blockIdx);
+
     if (Notification.permission === 'granted') {
         const notifBody = hasNextBlock
             ? `Time for ${blockName} is complete! Ready for Block ${blockIdx + 2}?`
@@ -2053,12 +2082,10 @@ function onBlockTimerComplete(blockIdx) {
         });
     }
 
-    // In-app notification banner
     showBlockTimerNotification(blockIdx, hasNextBlock, blockName);
 }
 
 function showBlockTimerNotification(blockIdx, hasNextBlock, blockName) {
-    // Remove any existing timer notification
     document.getElementById('block-timer-notif')?.remove();
 
     const notifEl = document.createElement('div');
@@ -2079,7 +2106,6 @@ function showBlockTimerNotification(blockIdx, hasNextBlock, blockName) {
     `;
     document.body.appendChild(notifEl);
 
-    // Auto-dismiss after 15 seconds
     setTimeout(() => document.getElementById('block-timer-notif')?.remove(), 15000);
 }
 
@@ -2093,24 +2119,20 @@ function scrollToBlock(blockIdx) {
 }
 
 function syncTimersFromBlockInput() {
-    // Called whenever block-tasks text or hours/blocks inputs change.
-    // Re-reads each block's duration and updates idle (not running) timers.
     const blocksCount = parseInt(document.getElementById('blocks')?.value) || 1;
     for (let i = 0; i < blocksCount; i++) {
         const newTotal = getBlockDurationSeconds(i);
         const state = blockTimerState[i];
-        if (!state) continue; // will be init'd fresh on next render
+        if (!state) continue;
+        
         if (state.running) {
-            // Timer is live — don't reset, just update the total so
-            // colour thresholds recalculate correctly going forward.
             state.totalSeconds = newTotal;
         } else {
-            // Timer is idle/paused — update both total and remaining
-            // so the display reflects the new duration immediately.
-            if (state.intervalId) clearInterval(state.intervalId);
-            state.intervalId = null;
+            if (state.animationFrameId) cancelAnimationFrame(state.animationFrameId);
+            state.animationFrameId = null;
             state.totalSeconds = newTotal;
             state.remainingSeconds = newTotal;
+            state.lastTickTime = null;
         }
         updateTimerUI(i);
     }
@@ -2120,9 +2142,12 @@ function buildTimerHTML(blockIdx) {
     initBlockTimer(blockIdx);
     const state = blockTimerState[blockIdx];
     const display = formatTimerDisplay(state.remainingSeconds);
+    const isComplete = state.remainingSeconds <= 0;
+    const displayClass = isComplete ? 'timer-done' : '';
+    
     return `<div class="block-timer-section">
         <span class="block-timer-label">⏱️ Timer</span>
-        <span class="block-timer-display" id="timer-display-${blockIdx}">${display}</span>
+        <span class="block-timer-display ${displayClass}" id="timer-display-${blockIdx}">${display}</span>
         <button type="button" class="btn-timer btn-timer-start" id="timer-start-${blockIdx}" onclick="startBlockTimer(${blockIdx})">▶ Start</button>
         <button type="button" class="btn-timer btn-timer-pause" id="timer-pause-${blockIdx}" style="display:none;" onclick="pauseBlockTimer(${blockIdx})">⏸ Pause</button>
         <button type="button" class="btn-timer btn-timer-reset" onclick="resetBlockTimer(${blockIdx})">🔄 Reset</button>
