@@ -83,6 +83,16 @@ function loadExistingUsersDropdown() {
             const entryCount = history.length;
             select.innerHTML += `<option value="${escapeHtml(user)}">${escapeHtml(user)} (${entryCount} entries)</option>`;
         });
+        
+        // Add delete button row on login screen
+        const existingDeleteRow = document.getElementById('user-delete-row');
+        if (existingDeleteRow) existingDeleteRow.remove();
+        
+        const deleteRow = document.createElement('div');
+        deleteRow.id = 'user-delete-row';
+        deleteRow.style.cssText = 'margin-top: 10px; text-align: right;';
+        deleteRow.innerHTML = `<button onclick="showDeleteUserFromLogin()" class="btn btn-sm btn-danger" style="padding: 6px 12px; background: #EF4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">🗑️ Delete Selected User</button>`;
+        section.appendChild(deleteRow);
     } else if (section) {
         section.style.display = 'none';
     }
@@ -99,6 +109,40 @@ function selectExistingUser() {
         setTimeout(() => {
             startSession();
         }, 300);
+    }
+}
+
+// Show delete user option from login screen
+function showDeleteUserFromLogin() {
+    const select = document.getElementById('existing-user-select');
+    const selectedUser = select.value;
+    
+    if (!selectedUser) {
+        showAlert('Please select a user to delete', 'warning');
+        addShakeAnimation(select);
+        return;
+    }
+    
+    if (confirm(`⚠️ Are you sure you want to delete user "${selectedUser}"?\n\nThis will permanently delete ALL their data.\n\nThis action CANNOT be undone!\n\nConfirm deletion?`)) {
+        // Delete the user
+        localStorage.removeItem(`chimla_history_${selectedUser}`);
+        localStorage.removeItem(`chimla_persistent_${selectedUser}`);
+        
+        let users = getAllUsernames();
+        const updatedUsers = users.filter(u => u !== selectedUser);
+        localStorage.setItem('chimla_all_users', JSON.stringify(updatedUsers));
+        
+        // Clear the input if it matches
+        const userNameInput = document.getElementById('user-name');
+        if (userNameInput.value === selectedUser) {
+            userNameInput.value = '';
+            validateUsernameOnInput();
+        }
+        
+        showAlert(`✅ User "${selectedUser}" deleted!`, 'success');
+        
+        // Reload the dropdown
+        loadExistingUsersDropdown();
     }
 }
 
@@ -281,7 +325,7 @@ function addUserManagerButton() {
     }
 }
 
-// Show user manager modal
+// Show user manager modal with delete option
 function showUserManager() {
     const users = getAllUsernames();
     if (users.length === 0) {
@@ -295,18 +339,76 @@ function showUserManager() {
         const entryCount = history.length;
         const lastEntry = history.length > 0 ? new Date(history[history.length - 1].timestamp).toLocaleDateString() : 'No entries';
         const isCurrent = (currentUserName === user);
-        usersHtml += `<li style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <div>
+        usersHtml += `<li style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="flex: 1;">
                 <strong>${escapeHtml(user)}</strong>${isCurrent ? ' <span style="color: var(--success);">✓ Current</span>' : ''}<br>
                 <small style="color: var(--text-muted);">${entryCount} entries · Last: ${lastEntry}</small>
             </div>
-            ${!isCurrent ? `<button onclick="switchToUser('${escapeHtml(user)}')" class="btn btn-sm btn-primary" style="padding: 6px 12px;">Switch</button>` : '<span style="padding: 6px 12px; opacity: 0.5;">Current</span>'}
+            <div style="display: flex; gap: 8px;">
+                ${!isCurrent ? `<button onclick="switchToUser('${escapeHtml(user)}')" class="btn btn-sm btn-primary" style="padding: 6px 12px;">Switch</button>` : '<span style="padding: 6px 12px; opacity: 0.5;">Current</span>'}
+                <button onclick="confirmDeleteUser('${escapeHtml(user)}')" class="btn btn-sm btn-danger" style="padding: 6px 12px; background: #EF4444; color: white; border: none; border-radius: 6px; cursor: pointer;">🗑️ Delete</button>
+            </div>
         </li>`;
     });
     usersHtml += '</ul><button onclick="closeUserManager()" class="btn btn-secondary" style="width: 100%; margin-top: 15px;">Close</button></div>';
     
     const modalHtml = `<div id="user-manager-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10006;"><div style="background: var(--card-bg); padding: 24px; border-radius: 20px; max-width: 450px; width: 90%; max-height: 80vh; overflow-y: auto;">${usersHtml}</div></div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Confirm delete user with warning
+function confirmDeleteUser(username) {
+    const isCurrent = (currentUserName === username);
+    let warningMessage = '';
+    
+    if (isCurrent) {
+        warningMessage = `⚠️ WARNING: "${username}" is your CURRENT active user!\n\nDeleting this user will:\n• Delete all their history data\n• Log you out immediately\n\nThis action CANNOT be undone!\n\nAre you absolutely sure?`;
+    } else {
+        const history = getUserHistory(username);
+        const entryCount = history.length;
+        warningMessage = `⚠️ Are you sure you want to delete user "${username}"?\n\nThis will permanently delete:\n• ${entryCount} entry/entries\n• All productivity data\n• All settings for this user\n\nThis action CANNOT be undone!\n\nConfirm deletion?`;
+    }
+    
+    if (confirm(warningMessage)) {
+        deleteUser(username);
+    }
+}
+
+// Delete a user permanently
+function deleteUser(username) {
+    // Remove user's history data
+    localStorage.removeItem(`chimla_history_${username}`);
+    
+    // Remove user's persistent data
+    localStorage.removeItem(`chimla_persistent_${username}`);
+    
+    // Remove user from the all users list
+    let users = getAllUsernames();
+    const updatedUsers = users.filter(u => u !== username);
+    localStorage.setItem('chimla_all_users', JSON.stringify(updatedUsers));
+    
+    // Clear any auto-save markers for this user
+    const today = new Date().toLocaleDateString();
+    const autoSaveKey = `chimla_autosave_${username}_${today}`;
+    localStorage.removeItem(autoSaveKey);
+    
+    // Show success message
+    showAlert(`✅ User "${username}" has been deleted successfully!`, 'success');
+    
+    // If deleted user was the current user, log out
+    if (currentUserName === username) {
+        showAlert(`👋 You have been logged out because your user was deleted.`, 'warning');
+        logout();
+    } else {
+        // Close the user manager modal and refresh it
+        closeUserManager();
+        // If user manager is still needed, show updated list
+        setTimeout(() => {
+            if (document.getElementById('user-manager-modal')) {
+                showUserManager();
+            }
+        }, 100);
+    }
 }
 
 // Switch to a different user
@@ -2214,3 +2316,6 @@ window.pauseBlockTimer = pauseBlockTimer;
 window.resetBlockTimer = resetBlockTimer;
 window.scrollToBlock = scrollToBlock;
 window.syncTimersFromBlockInput = syncTimersFromBlockInput;
+window.confirmDeleteUser = confirmDeleteUser;
+window.deleteUser = deleteUser;
+window.showDeleteUserFromLogin = showDeleteUserFromLogin;

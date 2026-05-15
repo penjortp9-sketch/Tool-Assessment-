@@ -893,3 +893,37 @@ body {
     .container { border-radius: 20px; overflow: hidden; }
     .btn, .mood-btn, .history-item { -webkit-tap-highlight-color: transparent; }
 }
+/* Delete user button styles */
+.btn-danger {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+#user-delete-row {
+    margin-top: 10px;
+}
+
+/* Confirmation dialog styling (browser default is fine, but this adds consistency) */
+.confirm-delete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10007;
+}
